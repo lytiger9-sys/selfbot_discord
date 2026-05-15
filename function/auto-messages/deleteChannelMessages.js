@@ -1,0 +1,24 @@
+const { collectOwnMessages, deleteMessagesSequential } = require('../../utils/messageCleanup');
+const { sendTemporaryMessage } = require('../../utils/commandUtils');
+
+module.exports = {
+    name: '!삭제 채널',
+    description: '현재 채널에서 내가 보낸 메시지를 최근순으로 지정 개수만큼 삭제합니다.\n사용 예시: `!삭제 채널 15`',
+    async execute(message, args) {
+        const count = Number.parseInt(args[0], 10);
+
+        if (Number.isNaN(count) || count <= 0) {
+            return sendTemporaryMessage(message.channel, '사용법: `!삭제 채널 (개수)`', 2000);
+        }
+
+        const targets = await collectOwnMessages(
+            message.channel,
+            message.client.user.id,
+            count,
+            new Set([message.id])
+        );
+
+        const deletedCount = await deleteMessagesSequential(targets);
+        await sendTemporaryMessage(message.channel, `✅ 현재 채널에서 본인 메시지 ${deletedCount}개를 삭제했습니다.`, 2000);
+    }
+};
