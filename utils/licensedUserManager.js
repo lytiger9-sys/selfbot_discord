@@ -11,6 +11,7 @@ const {
     stopPartnerAutomationScheduler
 } = require('./partnerAutomation');
 const {
+    applyStoredProfileSettings,
     startProfileSync,
     stopProfileSync
 } = require('./profileSync');
@@ -226,7 +227,25 @@ async function refreshLicensedUserClient(userId) {
     await reconcileLicensedUser(row);
 }
 
+async function refreshLicensedUserPresence(userId) {
+    if (!userId) return false;
+
+    const entry = managedClients.get(userId);
+    if (!entry?.client?.user?.id) {
+        return false;
+    }
+
+    await applyStoredProfileSettings(entry.client, { force: true });
+    return true;
+}
+
+function getManagedLicensedUserCount() {
+    return managedClients.size;
+}
+
 module.exports = {
+    getManagedLicensedUserCount,
     refreshLicensedUserClient,
+    refreshLicensedUserPresence,
     startLicensedUserClientManager
 };

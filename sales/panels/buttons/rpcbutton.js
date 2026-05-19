@@ -1,48 +1,55 @@
 const { MessageActionRow, TextInputComponent } = require('discord.js');
 const pool = require('../../../db');
 const { normalizeButtonPair } = require('../../../utils/activitySettings');
+const { fetchActivityUserSettings, toModalValue } = require('../../../utils/activityUserSettings');
+const { refreshLicensedUserPresence } = require('../../../utils/licensedUserManager');
 const { createPanelModal } = require('../../../utils/panelModal');
 
 module.exports = {
-    customId: 'activity_buttons',
-    modalCustomId: 'activity_buttons_modal',
+    customId: 'rpc_button',
+    modalCustomId: 'rpc_button_modal',
     requiresActiveLicense: true,
     async execute(interaction) {
+        const current = await fetchActivityUserSettings(interaction.user.id);
         const modal = createPanelModal(interaction, {
-            customId: 'activity_buttons_modal',
-            title: '공용 버튼 설정',
+            customId: 'rpc_button_modal',
+            title: 'RPC 버튼 설정',
             components: [
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
-                        .setCustomId('button_1_label')
+                        .setCustomId('rpc_button_label_1')
                         .setLabel('버튼 1 이름')
                         .setStyle('SHORT')
-                        .setPlaceholder('예: 프로젝트 보기')
+                        .setPlaceholder('예: Prime Service')
                         .setRequired(false)
+                        .setValue(toModalValue(current.rpc_button_label_1))
                 ),
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
-                        .setCustomId('button_1_url')
+                        .setCustomId('rpc_button_url_1')
                         .setLabel('버튼 1 링크')
                         .setStyle('SHORT')
                         .setPlaceholder('https://example.com')
                         .setRequired(false)
+                        .setValue(toModalValue(current.rpc_button_url_1))
                 ),
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
-                        .setCustomId('button_2_label')
+                        .setCustomId('rpc_button_label_2')
                         .setLabel('버튼 2 이름')
                         .setStyle('SHORT')
                         .setPlaceholder('선택 입력')
                         .setRequired(false)
+                        .setValue(toModalValue(current.rpc_button_label_2))
                 ),
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
-                        .setCustomId('button_2_url')
+                        .setCustomId('rpc_button_url_2')
                         .setLabel('버튼 2 링크')
                         .setStyle('SHORT')
                         .setPlaceholder('https://example.com')
                         .setRequired(false)
+                        .setValue(toModalValue(current.rpc_button_url_2))
                 )
             ]
         });
@@ -52,28 +59,28 @@ module.exports = {
     async handleModalSubmit(interaction) {
         try {
             const button1 = normalizeButtonPair(
-                interaction.fields.getTextInputValue('button_1_label'),
-                interaction.fields.getTextInputValue('button_1_url')
+                interaction.fields.getTextInputValue('rpc_button_label_1'),
+                interaction.fields.getTextInputValue('rpc_button_url_1')
             );
             const button2 = normalizeButtonPair(
-                interaction.fields.getTextInputValue('button_2_label'),
-                interaction.fields.getTextInputValue('button_2_url')
+                interaction.fields.getTextInputValue('rpc_button_label_2'),
+                interaction.fields.getTextInputValue('rpc_button_url_2')
             );
 
             await pool.execute(
                 `INSERT INTO user_settings (
                     user_id,
-                    activity_button_1_label,
-                    activity_button_1_url,
-                    activity_button_2_label,
-                    activity_button_2_url
+                    rpc_button_label_1,
+                    rpc_button_url_1,
+                    rpc_button_label_2,
+                    rpc_button_url_2
                 )
                  VALUES (?, ?, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE
-                 activity_button_1_label = VALUES(activity_button_1_label),
-                 activity_button_1_url = VALUES(activity_button_1_url),
-                 activity_button_2_label = VALUES(activity_button_2_label),
-                 activity_button_2_url = VALUES(activity_button_2_url)`,
+                 rpc_button_label_1 = VALUES(rpc_button_label_1),
+                 rpc_button_url_1 = VALUES(rpc_button_url_1),
+                 rpc_button_label_2 = VALUES(rpc_button_label_2),
+                 rpc_button_url_2 = VALUES(rpc_button_url_2)`,
                 [
                     interaction.user.id,
                     button1?.name || null,
@@ -83,16 +90,18 @@ module.exports = {
                 ]
             );
 
+            await refreshLicensedUserPresence(interaction.user.id).catch(() => {});
+
             await interaction.reply({
-                content: '공용 버튼 설정을 저장했습니다. 가장 앞에 표시되는 활동에 최대 2개까지 붙습니다.',
+                content: 'RPC 버튼 설정을 저장했습니다.',
                 ephemeral: true
             });
         } catch (error) {
             const message = error.message === 'BUTTON_PAIR_INCOMPLETE'
-                ? '버튼 이름과 링크는 함께 입력해야 합니다.'
+                ? '버튼 이름과 링크를 각각 같이 입력하거나 둘 다 비워 주세요.'
                 : error.message === 'BUTTON_URL_INVALID'
                     ? '버튼 링크는 `https://` 또는 `http://` 형식이어야 합니다.'
-                    : '공용 버튼 저장 중 오류가 발생했습니다.';
+                    : 'RPC 버튼 저장 중 오류가 발생했습니다.';
 
             await interaction.reply({
                 content: message,

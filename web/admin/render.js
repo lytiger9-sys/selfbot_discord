@@ -456,6 +456,19 @@ function renderLayout({ title, body, pageClass = '' }) {
 </head>
 <body>
   <div class="page ${escapeHtml(pageClass)}">${body}</div>
+  <script>
+    document.addEventListener('submit', function(event) {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement)) {
+        return;
+      }
+
+      const message = form.dataset.confirm;
+      if (message && !window.confirm(message)) {
+        event.preventDefault();
+      }
+    });
+  </script>
 </body>
 </html>`;
 }
@@ -697,7 +710,7 @@ function renderLicenseTable(licenseRows, filters) {
                 <td>${escapeHtml(formatDateTime(row.expiry_date))}</td>
                 <td>${escapeHtml(formatDateTime(row.created_at))}</td>
                 <td>
-                  <form method="post" action="/admin/licenses/delete">
+                  <form method="post" action="/admin/licenses/delete" data-confirm="이 라이센스를 삭제할까요?">
                     <input type="hidden" name="license_id" value="${escapeHtml(row.id)}" />
                     <input type="hidden" name="return_q" value="${escapeHtml(filters.q || '')}" />
                     <input type="hidden" name="return_status" value="${escapeHtml(filters.status || 'all')}" />

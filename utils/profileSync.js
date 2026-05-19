@@ -6,76 +6,91 @@ const {
     normalizeOptionalText
 } = require('./activitySettings');
 
-const DEFAULT_STREAMING_URL = 'https://www.twitch.tv/discord';
+// Discord requires an activity name, but the product spec here wants only
+// title/details lines to be visible. Use a blank placeholder for the required
+// field and drive the visible text through details/state.
+const INVISIBLE_ACTIVITY_NAME = '\u3164';
 const DEFAULT_APPLICATION_ID = /^[0-9]{17,19}$/.test(String(process.env.CLIENT_ID || '').trim())
     ? String(process.env.CLIENT_ID).trim()
     : null;
 const clientStates = new Map();
+const clientStateAppliedAt = new Map();
 const syncIntervals = new WeakMap();
+const PRESENCE_REFRESH_WINDOW_MS = 2 * 60 * 1000;
+
+function normalizeStoredButtons(...candidates) {
+    const buttons = [];
+
+    for (const candidate of candidates) {
+        if (!candidate) {
+            continue;
+        }
+
+        try {
+            const button = normalizeButtonPair(candidate.label, candidate.url);
+            if (button) {
+                buttons.push(button);
+            }
+        } catch (error) {
+            continue;
+        }
+    }
+
+    return buttons.slice(0, 2);
+}
 
 function normalizeProfileSettings(row = {}) {
-    let sharedButton1 = null;
-    let sharedButton2 = null;
-
-    try {
-        sharedButton1 = normalizeButtonPair(row.activity_button_1_label, row.activity_button_1_url);
-    } catch (error) {
-        sharedButton1 = null;
-    }
-
-    try {
-        sharedButton2 = normalizeButtonPair(row.activity_button_2_label, row.activity_button_2_url);
-    } catch (error) {
-        sharedButton2 = null;
-    }
-
     return {
-        largeImageUrl: normalizeOptionalText(row.large_image_url),
-        smallImageUrl: normalizeOptionalText(row.small_image_url),
-        sharedButtons: [sharedButton1, sharedButton2].filter(Boolean).slice(0, 2),
         streaming: {
             title: normalizeOptionalText(row.streaming_text),
             details: normalizeOptionalText(row.streaming_details),
-            elapsedSeconds: normalizeOptionalInteger(row.streaming_elapsed_seconds)
+            elapsedSeconds: normalizeOptionalInteger(row.streaming_elapsed_seconds),
+            largeImageUrl: normalizeOptionalText(row.streaming_large_image_url),
+            smallImageUrl: normalizeOptionalText(row.streaming_small_image_url),
+            buttons: normalizeStoredButtons(
+                { label: row.streaming_button_label, url: row.streaming_button_url },
+                { label: row.streaming_button_label_2, url: row.streaming_button_url_2 }
+            )
         },
-        rpc1: {
+        rpc: {
             title: normalizeOptionalText(row.rpc_text_1 || row.rpc_text),
             details: normalizeOptionalText(row.rpc_details_1),
-            elapsedSeconds: normalizeOptionalInteger(row.rpc_elapsed_seconds_1)
-        },
-        rpc2: {
-            title: normalizeOptionalText(row.rpc_text_2),
-            details: normalizeOptionalText(row.rpc_details_2),
-            elapsedSeconds: normalizeOptionalInteger(row.rpc_elapsed_seconds_2)
+            elapsedSeconds: normalizeOptionalInteger(row.rpc_elapsed_seconds_1),
+            largeImageUrl: normalizeOptionalText(row.rpc_large_image_url),
+            smallImageUrl: normalizeOptionalText(row.rpc_small_image_url),
+            buttons: normalizeStoredButtons(
+                { label: row.rpc_button_label_1, url: row.rpc_button_url_1 },
+                { label: row.rpc_button_label_2, url: row.rpc_button_url_2 }
+            )
         }
     };
 }
 
-function applyActivityAssets(activity, settings) {
+function applyActivityAssets(activity, activitySettings) {
     try {
-        if (settings.largeImageUrl) {
-            activity.setAssetsLargeImage(settings.largeImageUrl);
+        if (activitySettings.largeImageUrl) {
+            activity.setAssetsLargeImage(activitySettings.largeImageUrl);
         }
     } catch (error) {
         // Ignore invalid image payloads and continue syncing the rest.
     }
 
     try {
-        if (settings.smallImageUrl) {
-            activity.setAssetsSmallImage(settings.smallImageUrl);
+        if (activitySettings.smallImageUrl) {
+            activity.setAssetsSmallImage(activitySettings.smallImageUrl);
         }
     } catch (error) {
         // Ignore invalid image payloads and continue syncing the rest.
     }
 }
 
-function applySharedButtons(activity, sharedButtons) {
-    if (!sharedButtons.length) {
+function applyActivityButtons(activity, buttons) {
+    if (!Array.isArray(buttons) || buttons.length === 0) {
         return;
     }
 
     try {
-        activity.setButtons(...sharedButtons);
+        activity.setButtons(...buttons);
     } catch (error) {
         // Ignore invalid button payloads until the user stores a valid one.
     }
@@ -95,9 +110,9 @@ function assignActivityIdentity(activity, activityId, index) {
     activity.createdTimestamp = Date.now() + index;
 }
 
-function createActivity(client, descriptor, settings) {
+function createActivity(client, descriptor) {
     const activity = new RichPresence(client)
-        .setName(descriptor.title)
+        .setName(INVISIBLE_ACTIVITY_NAME)
         .setType(descriptor.type);
 
     assignActivityIdentity(activity, descriptor.activityId, descriptor.index);
@@ -106,16 +121,17 @@ function createActivity(client, descriptor, settings) {
         activity.setApplicationId(DEFAULT_APPLICATION_ID);
     }
 
-    if (descriptor.type === 'STREAMING') {
-        activity.setURL(DEFAULT_STREAMING_URL);
+    if (descriptor.title) {
+        activity.setDetails(descriptor.title);
     }
 
     if (descriptor.details) {
-        activity.setDetails(descriptor.details);
+        activity.setState(descriptor.details);
     }
 
     applyElapsedTimestamp(activity, descriptor.elapsedSeconds);
-    applyActivityAssets(activity, settings);
+    applyActivityAssets(activity, descriptor);
+    applyActivityButtons(activity, descriptor.buttons);
 
     return activity;
 }
@@ -127,55 +143,32 @@ function buildActivities(client, settings) {
         descriptors.push({
             activityId: 'vc-streaming',
             type: 'STREAMING',
-            title: settings.streaming.title,
-            details: settings.streaming.details,
-            elapsedSeconds: settings.streaming.elapsedSeconds
+            index: descriptors.length,
+            ...settings.streaming
         });
     }
 
-    if (settings.rpc1.title) {
+    if (settings.rpc.title) {
         descriptors.push({
-            activityId: 'vc-rpc-1',
+            activityId: 'vc-rpc',
             type: 'PLAYING',
-            title: settings.rpc1.title,
-            details: settings.rpc1.details,
-            elapsedSeconds: settings.rpc1.elapsedSeconds
+            index: descriptors.length,
+            ...settings.rpc
         });
     }
 
-    if (settings.rpc2.title) {
-        descriptors.push({
-            activityId: 'vc-rpc-2',
-            type: 'PLAYING',
-            title: settings.rpc2.title,
-            details: settings.rpc2.details,
-            elapsedSeconds: settings.rpc2.elapsedSeconds
-        });
-    }
-
-    const activities = descriptors.map((descriptor, index) => createActivity(client, {
-        ...descriptor,
-        index
-    }, settings));
-
-    // Discord often collapses multi-activity payloads when every item carries
-    // button metadata, so shared buttons are attached only to the first item.
-    if (activities.length) {
-        applySharedButtons(activities[0], settings.sharedButtons);
-    }
-
-    return activities;
+    return descriptors.map(descriptor => createActivity(client, descriptor));
 }
 
 function buildSettingsSignature(settings) {
     return JSON.stringify({
-        presenceVersion: 2,
+        presenceVersion: 10,
         applicationId: DEFAULT_APPLICATION_ID,
         settings
     });
 }
 
-async function applyStoredProfileSettings(client) {
+async function applyStoredProfileSettings(client, { force = false } = {}) {
     if (!client.user?.id) return;
 
     const [rows] = await pool.execute(
@@ -183,19 +176,22 @@ async function applyStoredProfileSettings(client) {
             streaming_text,
             streaming_details,
             streaming_elapsed_seconds,
+            streaming_button_label,
+            streaming_button_url,
+            streaming_button_label_2,
+            streaming_button_url_2,
+            streaming_large_image_url,
+            streaming_small_image_url,
             rpc_text,
             rpc_text_1,
             rpc_details_1,
             rpc_elapsed_seconds_1,
-            rpc_text_2,
-            rpc_details_2,
-            rpc_elapsed_seconds_2,
-            large_image_url,
-            small_image_url,
-            activity_button_1_label,
-            activity_button_1_url,
-            activity_button_2_label,
-            activity_button_2_url
+            rpc_button_label_1,
+            rpc_button_url_1,
+            rpc_button_label_2,
+            rpc_button_url_2,
+            rpc_large_image_url,
+            rpc_small_image_url
          FROM user_settings
          WHERE user_id = ?`,
         [client.user.id]
@@ -203,8 +199,10 @@ async function applyStoredProfileSettings(client) {
 
     const settings = normalizeProfileSettings(rows[0] || {});
     const signature = buildSettingsSignature(settings);
+    const lastAppliedAt = clientStateAppliedAt.get(client.user.id) || 0;
+    const recentlyApplied = (Date.now() - lastAppliedAt) < PRESENCE_REFRESH_WINDOW_MS;
 
-    if (clientStates.get(client.user.id) === signature) {
+    if (!force && recentlyApplied && clientStates.get(client.user.id) === signature) {
         return;
     }
 
@@ -213,11 +211,13 @@ async function applyStoredProfileSettings(client) {
     if (!activities.length) {
         await Promise.resolve(client.user.setPresence({ activities: [] }));
         clientStates.set(client.user.id, signature);
+        clientStateAppliedAt.set(client.user.id, Date.now());
         return;
     }
 
     await Promise.resolve(client.user.setPresence({ activities }));
     clientStates.set(client.user.id, signature);
+    clientStateAppliedAt.set(client.user.id, Date.now());
 }
 
 function startProfileSync(client) {
@@ -245,6 +245,7 @@ function stopProfileSync(client) {
 
     if (client.user?.id) {
         clientStates.delete(client.user.id);
+        clientStateAppliedAt.delete(client.user.id);
     }
 }
 

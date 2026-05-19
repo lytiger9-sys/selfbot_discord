@@ -96,10 +96,16 @@ async function migrateUserSettingsTable() {
     await ensureColumn('user_settings', 'streaming_elapsed_seconds', 'INT DEFAULT NULL');
     await ensureColumn('user_settings', 'streaming_button_label', 'VARCHAR(64) DEFAULT NULL');
     await ensureColumn('user_settings', 'streaming_button_url', 'TEXT DEFAULT NULL');
+    await ensureColumn('user_settings', 'streaming_button_label_2', 'VARCHAR(64) DEFAULT NULL');
+    await ensureColumn('user_settings', 'streaming_button_url_2', 'TEXT DEFAULT NULL');
+    await ensureColumn('user_settings', 'streaming_large_image_url', 'TEXT');
+    await ensureColumn('user_settings', 'streaming_small_image_url', 'TEXT');
     await ensureColumn('user_settings', 'rpc_details_1', 'TEXT');
     await ensureColumn('user_settings', 'rpc_elapsed_seconds_1', 'INT DEFAULT NULL');
     await ensureColumn('user_settings', 'rpc_button_label_1', 'VARCHAR(64) DEFAULT NULL');
     await ensureColumn('user_settings', 'rpc_button_url_1', 'TEXT DEFAULT NULL');
+    await ensureColumn('user_settings', 'rpc_large_image_url', 'TEXT');
+    await ensureColumn('user_settings', 'rpc_small_image_url', 'TEXT');
     await ensureColumn('user_settings', 'rpc_details_2', 'TEXT');
     await ensureColumn('user_settings', 'rpc_elapsed_seconds_2', 'INT DEFAULT NULL');
     await ensureColumn('user_settings', 'rpc_button_label_2', 'VARCHAR(64) DEFAULT NULL');
@@ -117,6 +123,46 @@ async function migrateUserSettingsTable() {
              WHERE rpc_text IS NOT NULL`
         );
     }
+
+    await pool.execute(
+        `UPDATE user_settings
+         SET rpc_text_1 = COALESCE(rpc_text_1, rpc_text_2),
+             rpc_details_1 = COALESCE(rpc_details_1, rpc_details_2),
+             rpc_elapsed_seconds_1 = COALESCE(rpc_elapsed_seconds_1, rpc_elapsed_seconds_2),
+             rpc_button_label_1 = COALESCE(rpc_button_label_1, rpc_button_label_2),
+             rpc_button_url_1 = COALESCE(rpc_button_url_1, rpc_button_url_2)
+         WHERE rpc_text_2 IS NOT NULL
+            OR rpc_details_2 IS NOT NULL
+            OR rpc_elapsed_seconds_2 IS NOT NULL
+            OR rpc_button_label_2 IS NOT NULL
+            OR rpc_button_url_2 IS NOT NULL`
+    );
+
+    await pool.execute(
+        `UPDATE user_settings
+         SET streaming_large_image_url = COALESCE(streaming_large_image_url, large_image_url),
+             streaming_small_image_url = COALESCE(streaming_small_image_url, small_image_url),
+             rpc_large_image_url = COALESCE(rpc_large_image_url, large_image_url),
+             rpc_small_image_url = COALESCE(rpc_small_image_url, small_image_url)
+         WHERE large_image_url IS NOT NULL
+            OR small_image_url IS NOT NULL`
+    );
+
+    await pool.execute(
+        `UPDATE user_settings
+         SET streaming_button_label = COALESCE(streaming_button_label, activity_button_1_label),
+             streaming_button_url = COALESCE(streaming_button_url, activity_button_1_url),
+             streaming_button_label_2 = COALESCE(streaming_button_label_2, activity_button_2_label),
+             streaming_button_url_2 = COALESCE(streaming_button_url_2, activity_button_2_url),
+             rpc_button_label_1 = COALESCE(rpc_button_label_1, activity_button_1_label),
+             rpc_button_url_1 = COALESCE(rpc_button_url_1, activity_button_1_url),
+             rpc_button_label_2 = COALESCE(rpc_button_label_2, activity_button_2_label),
+             rpc_button_url_2 = COALESCE(rpc_button_url_2, activity_button_2_url)
+         WHERE activity_button_1_label IS NOT NULL
+            OR activity_button_1_url IS NOT NULL
+            OR activity_button_2_label IS NOT NULL
+            OR activity_button_2_url IS NOT NULL`
+    );
 }
 
 async function migrateAdminAccountsTable() {
@@ -128,6 +174,12 @@ async function migrateAdminAccountsTable() {
     await ensureColumn('admin_accounts', 'is_active', 'BOOLEAN DEFAULT TRUE');
     await ensureColumn('admin_accounts', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
     await ensureColumn('admin_accounts', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+}
+
+async function migratePanelMessagesTable() {
+    await ensureColumn('panel_messages', 'channel_id', 'VARCHAR(50) NOT NULL');
+    await ensureColumn('panel_messages', 'last_refreshed_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
+    await ensureColumn('panel_messages', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
 }
 
 async function ensureCoreSchema() {
@@ -160,12 +212,18 @@ async function ensureCoreSchema() {
                 streaming_elapsed_seconds INT DEFAULT NULL,
                 streaming_button_label VARCHAR(64) DEFAULT NULL,
                 streaming_button_url TEXT,
+                streaming_button_label_2 VARCHAR(64) DEFAULT NULL,
+                streaming_button_url_2 TEXT,
+                streaming_large_image_url TEXT,
+                streaming_small_image_url TEXT,
                 rpc_text TEXT,
                 rpc_text_1 TEXT,
                 rpc_details_1 TEXT,
                 rpc_elapsed_seconds_1 INT DEFAULT NULL,
                 rpc_button_label_1 VARCHAR(64) DEFAULT NULL,
                 rpc_button_url_1 TEXT,
+                rpc_large_image_url TEXT,
+                rpc_small_image_url TEXT,
                 rpc_text_2 TEXT,
                 rpc_details_2 TEXT,
                 rpc_elapsed_seconds_2 INT DEFAULT NULL,
@@ -222,6 +280,16 @@ async function ensureCoreSchema() {
             )
         `);
         await migrateAdminAccountsTable();
+
+        await pool.execute(`
+            CREATE TABLE IF NOT EXISTS panel_messages (
+                message_id VARCHAR(50) PRIMARY KEY,
+                channel_id VARCHAR(50) NOT NULL,
+                last_refreshed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await migratePanelMessagesTable();
 
         await pool.execute(`
             CREATE TABLE IF NOT EXISTS guild_templates (
