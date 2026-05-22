@@ -1,11 +1,46 @@
 const mysql = require('mysql2/promise');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
+
+function isTruthy(value) {
+    return /^(1|true|yes|on)$/i.test(String(value || '').trim());
+}
+
+function isFalsy(value) {
+    return /^(0|false|no|off)$/i.test(String(value || '').trim());
+}
+
+function buildSslConfig() {
+    if (!isTruthy(process.env.DB_SSL)) {
+        return undefined;
+    }
+
+    const ssl = {
+        rejectUnauthorized: !isFalsy(process.env.DB_SSL_REJECT_UNAUTHORIZED || 'true')
+    };
+
+    if (process.env.DB_SSL_CA_B64) {
+        ssl.ca = Buffer.from(String(process.env.DB_SSL_CA_B64).trim(), 'base64').toString('utf8');
+    } else if (process.env.DB_SSL_CA) {
+        ssl.ca = String(process.env.DB_SSL_CA).replace(/\\n/g, '\n');
+    } else if (process.env.DB_SSL_CA_PATH) {
+        ssl.ca = fs.readFileSync(
+            path.resolve(process.cwd(), String(process.env.DB_SSL_CA_PATH).trim()),
+            'utf8'
+        );
+    }
+
+    return ssl;
+}
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
+    port: Number.parseInt(process.env.DB_PORT || '3306', 10),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'bot_db',
+    ssl: buildSslConfig(),
     waitForConnections: true,
     connectionLimit: 10
 });

@@ -182,10 +182,20 @@ function buildRelativeUrl(path, searchParams) {
 }
 
 function describeError(error) {
+    if (error instanceof AggregateError) {
+        return {
+            name: error.name,
+            message: error.message,
+            errors: (error.errors || []).map(item => describeError(item))
+        };
+    }
+
     if (error instanceof Error) {
         return {
             name: error.name,
             message: error.message,
+            code: error.code || '',
+            errno: error.errno || '',
             stack: error.stack
         };
     }
