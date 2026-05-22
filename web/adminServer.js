@@ -171,6 +171,32 @@ function appendFlash(path, key, value) {
     return `${url.pathname}${url.search}`;
 }
 
+function buildRelativeUrl(path, searchParams) {
+    const url = new URL(`http://localhost${path}`);
+
+    for (const [key, value] of searchParams.entries()) {
+        url.searchParams.append(key, value);
+    }
+
+    return `${url.pathname}${url.search}`;
+}
+
+function describeError(error) {
+    if (error instanceof Error) {
+        return {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+        };
+    }
+
+    if (error && typeof error === 'object') {
+        return error;
+    }
+
+    return { value: String(error) };
+}
+
 function getRoleLandingPath(session) {
     return session.isSuperAdmin ? '/admin/admins' : '/admin/licenses';
 }
@@ -182,6 +208,22 @@ function mapLoginError(error) {
 
     if (error.message === 'DISCORD_OAUTH_STATE_INVALID') {
         return '로그인 상태 검증에 실패했습니다. 배포 주소와 쿠키 설정을 확인해 주세요.';
+    }
+
+    if (error.message === 'DISCORD_OAUTH_CODE_MISSING') {
+        return 'Discord 콜백에 code 값이 없습니다. OAuth Redirect URI를 다시 확인해 주세요.';
+    }
+
+    if (error.message === 'DISCORD_OAUTH_STATE_MISSING') {
+        return 'Discord 콜백에 state 값이 없습니다. OAuth 설정을 다시 확인해 주세요.';
+    }
+
+    if (error.message === 'DISCORD_OAUTH_STATE_COOKIE_MISMATCH') {
+        return 'OAuth state 쿠키가 일치하지 않습니다. 브라우저 쿠키와 배포 주소를 확인해 주세요.';
+    }
+
+    if (error.message === 'DISCORD_OAUTH_STATE_EXPIRED') {
+        return 'OAuth state가 만료되었거나 서버가 재시작되었습니다. 다시 로그인해 주세요.';
     }
 
     switch (error.message) {
@@ -249,6 +291,12 @@ async function handleRequest(req, res) {
     }
 
     if (req.method === 'GET' && url.pathname === '/admin/login') {
+        if (url.searchParams.get('code') || url.searchParams.get('state')) {
+            console.warn('[Admin OAuth] code/state arrived on /admin/login; redirecting to /admin/oauth/callback');
+            redirect(res, buildRelativeUrl('/admin/oauth/callback', url.searchParams));
+            return;
+        }
+
         sendHtml(res, renderLoginPage({
             noticeMessage: url.searchParams.get('notice') || '',
             errorMessage: url.searchParams.get('error') || ''
@@ -275,8 +323,20 @@ async function handleRequest(req, res) {
             const cookies = parseCookies(req.headers.cookie || '');
             const stateCookie = String(cookies[OAUTH_STATE_COOKIE_NAME] || '').trim();
 
-            if (!code || !state || state !== stateCookie || !consumeOAuthState(state)) {
-                throw new Error('DISCORD_OAUTH_STATE_INVALID');
+            if (!code) {
+                throw new Error('DISCORD_OAUTH_CODE_MISSING');
+            }
+
+            if (!state) {
+                throw new Error('DISCORD_OAUTH_STATE_MISSING');
+            }
+
+            if (state !== stateCookie) {
+                throw new Error('DISCORD_OAUTH_STATE_COOKIE_MISMATCH');
+            }
+
+            if (!consumeOAuthState(state)) {
+                throw new Error('DISCORD_OAUTH_STATE_EXPIRED');
             }
 
             appendSetCookie(res, serializeCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAge: 0 }));
@@ -309,7 +369,20 @@ async function handleRequest(req, res) {
             appendSetCookie(res, serializeCookie(SESSION_COOKIE_NAME, sessionId, { maxAge: SESSION_TTL_MS / 1000 }));
             redirect(res, getRoleLandingPath({ isSuperAdmin }));
         } catch (error) {
-            console.error('[Admin OAuth Callback]', error.message);
+            console.error('[Admin OAuth Callback]', JSON.stringify({
+                error: describeError(error),
+                query: {
+                    hasCode: Boolean(url.searchParams.get('code')),
+                    hasState: Boolean(url.searchParams.get('state')),
+                    error: url.searchParams.get('error') || '',
+                    errorDescription: url.searchParams.get('error_description') || ''
+                },
+                cookie: {
+                    hasStateCookie: Boolean(parseCookies(req.headers.cookie || '')[OAUTH_STATE_COOKIE_NAME]),
+                    host: req.headers.host || '',
+                    forwardedProto: req.headers['x-forwarded-proto'] || ''
+                }
+            }));
             redirect(res, appendFlash('/admin/login', 'error', mapLoginError(error)));
         }
         return;
