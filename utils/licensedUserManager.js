@@ -15,6 +15,10 @@ const {
     startProfileSync,
     stopProfileSync
 } = require('./profileSync');
+const {
+    startGuildDmBlockScheduler,
+    stopGuildDmBlockScheduler
+} = require('./guildDmBlocker');
 
 const managedClients = new Map();
 const retryAfterMap = new Map();
@@ -81,6 +85,7 @@ async function stopLicensedUserClient(userId, { backoffMs = 0 } = {}) {
     try {
         stopPartnerAutomationScheduler(entry.client);
         stopProfileSync(entry.client);
+        stopGuildDmBlockScheduler(entry.client);
         entry.client.removeAllListeners();
         entry.client.destroy();
     } catch (error) {
@@ -134,6 +139,7 @@ async function startLicensedUserClient(userId, encryptedToken) {
         console.log(`[LicensedUser] ${client.user.tag} 유저 클라이언트 연결됨 (${client.commands.size} commands)`);
         startPartnerAutomationScheduler(client);
         startProfileSync(client);
+        startGuildDmBlockScheduler(client);
     });
 
     client.on('error', error => {

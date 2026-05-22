@@ -182,6 +182,11 @@ async function migratePanelMessagesTable() {
     await ensureColumn('panel_messages', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
 }
 
+async function migrateGuildDmBlockSettingsTable() {
+    await ensureColumn('guild_dm_block_settings', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    await ensureColumn('guild_dm_block_settings', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+}
+
 async function ensureCoreSchema() {
     if (schemaEnsured) return;
     if (schemaPromise) return schemaPromise;
@@ -290,6 +295,17 @@ async function ensureCoreSchema() {
             )
         `);
         await migratePanelMessagesTable();
+
+        await pool.execute(`
+            CREATE TABLE IF NOT EXISTS guild_dm_block_settings (
+                user_id VARCHAR(50) NOT NULL,
+                guild_id VARCHAR(50) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, guild_id)
+            )
+        `);
+        await migrateGuildDmBlockSettingsTable();
 
         await pool.execute(`
             CREATE TABLE IF NOT EXISTS guild_templates (

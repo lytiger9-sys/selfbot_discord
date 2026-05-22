@@ -6,10 +6,6 @@ const {
     normalizeOptionalText
 } = require('./activitySettings');
 
-// Discord requires an activity name, but the product spec here wants only
-// title/details lines to be visible. Use a blank placeholder for the required
-// field and drive the visible text through details/state.
-const INVISIBLE_ACTIVITY_NAME = '\u3164';
 const DEFAULT_APPLICATION_ID = /^[0-9]{17,19}$/.test(String(process.env.CLIENT_ID || '').trim())
     ? String(process.env.CLIENT_ID).trim()
     : null;
@@ -39,6 +35,14 @@ function normalizeStoredButtons(...candidates) {
     return buttons.slice(0, 2);
 }
 
+function pickPrimaryLinkUrl(buttons = []) {
+    if (!Array.isArray(buttons) || buttons.length === 0) {
+        return null;
+    }
+
+    return normalizeOptionalText(buttons[0]?.url);
+}
+
 function normalizeProfileSettings(row = {}) {
     return {
         streaming: {
@@ -63,6 +67,40 @@ function normalizeProfileSettings(row = {}) {
                 { label: row.rpc_button_label_2, url: row.rpc_button_url_2 }
             )
         }
+    };
+}
+
+function buildStreamingDescriptor(settings, index) {
+    return {
+        activityId: 'vc-streaming',
+        type: 'STREAMING',
+        index,
+        title: settings.title,
+        details: settings.details,
+        // Prefer the clickable button area for streaming activities.
+        elapsedSeconds: null,
+        largeImageUrl: settings.largeImageUrl,
+        smallImageUrl: settings.smallImageUrl,
+        buttons: settings.buttons,
+        url: pickPrimaryLinkUrl(settings.buttons)
+    };
+}
+
+function buildRpcDescriptor(settings, index) {
+    const hasElapsedTimer = Number.isInteger(settings.elapsedSeconds) && settings.elapsedSeconds >= 0;
+
+    return {
+        activityId: 'vc-rpc',
+        type: 'PLAYING',
+        index,
+        title: settings.title,
+        details: settings.details,
+        elapsedSeconds: settings.elapsedSeconds,
+        largeImageUrl: settings.largeImageUrl,
+        smallImageUrl: settings.smallImageUrl,
+        // When an RPC timer exists, omit buttons so Discord can keep the timer line visible.
+        buttons: hasElapsedTimer ? [] : settings.buttons,
+        url: null
     };
 }
 
@@ -112,7 +150,7 @@ function assignActivityIdentity(activity, activityId, index) {
 
 function createActivity(client, descriptor) {
     const activity = new RichPresence(client)
-        .setName(INVISIBLE_ACTIVITY_NAME)
+        .setName(descriptor.title)
         .setType(descriptor.type);
 
     assignActivityIdentity(activity, descriptor.activityId, descriptor.index);
@@ -121,12 +159,12 @@ function createActivity(client, descriptor) {
         activity.setApplicationId(DEFAULT_APPLICATION_ID);
     }
 
-    if (descriptor.title) {
-        activity.setDetails(descriptor.title);
+    if (descriptor.url) {
+        activity.setURL(descriptor.url);
     }
 
     if (descriptor.details) {
-        activity.setState(descriptor.details);
+        activity.setDetails(descriptor.details);
     }
 
     applyElapsedTimestamp(activity, descriptor.elapsedSeconds);
@@ -140,21 +178,11 @@ function buildActivities(client, settings) {
     const descriptors = [];
 
     if (settings.streaming.title) {
-        descriptors.push({
-            activityId: 'vc-streaming',
-            type: 'STREAMING',
-            index: descriptors.length,
-            ...settings.streaming
-        });
+        descriptors.push(buildStreamingDescriptor(settings.streaming, descriptors.length));
     }
 
     if (settings.rpc.title) {
-        descriptors.push({
-            activityId: 'vc-rpc',
-            type: 'PLAYING',
-            index: descriptors.length,
-            ...settings.rpc
-        });
+        descriptors.push(buildRpcDescriptor(settings.rpc, descriptors.length));
     }
 
     return descriptors.map(descriptor => createActivity(client, descriptor));
@@ -162,7 +190,7 @@ function buildActivities(client, settings) {
 
 function buildSettingsSignature(settings) {
     return JSON.stringify({
-        presenceVersion: 10,
+        presenceVersion: 11,
         applicationId: DEFAULT_APPLICATION_ID,
         settings
     });

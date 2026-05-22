@@ -9,6 +9,10 @@ function getLegacyAdminFilePath() {
     return path.join(__dirname, '..', 'sales', 'masters.json');
 }
 
+function hasLegacyAdminFile() {
+    return fs.existsSync(getLegacyAdminFilePath());
+}
+
 function getSuperAdminId() {
     const configured = String(process.env.SUPER_ADMIN_ID || process.env.OWNER_ID || '').trim();
     if (configured) {
@@ -21,7 +25,7 @@ function getSuperAdminId() {
 function readLegacyAdminRecords() {
     const filePath = getLegacyAdminFilePath();
 
-    if (!fs.existsSync(filePath)) {
+    if (!hasLegacyAdminFile()) {
         return [];
     }
 
@@ -71,6 +75,10 @@ function formatLegacyDate(value) {
 }
 
 async function syncLegacyAdminFile() {
+    if (!hasLegacyAdminFile()) {
+        return false;
+    }
+
     const accounts = await fetchActiveAdminAccounts();
     const payload = {
         developers: accounts.map(account => ({
@@ -82,11 +90,17 @@ async function syncLegacyAdminFile() {
         note: '관리자 계정 동기화 파일입니다. 웹 패널과 DB 기준으로 자동 갱신됩니다.'
     };
 
-    fs.writeFileSync(
-        getLegacyAdminFilePath(),
-        JSON.stringify(payload, null, 2),
-        'utf8'
-    );
+    try {
+        fs.writeFileSync(
+            getLegacyAdminFilePath(),
+            JSON.stringify(payload, null, 2),
+            'utf8'
+        );
+        return true;
+    } catch (error) {
+        console.warn('[AdminStore Legacy Write]', error.message);
+        return false;
+    }
 }
 
 async function seedAdminAccountsFromLegacyFile() {
@@ -124,6 +138,10 @@ async function ensureAdminBootstrap() {
     await seedAdminAccountsFromLegacyFile();
     await refreshAdminCache();
     await syncLegacyAdminFile();
+
+    if (!getSuperAdminId()) {
+        console.warn('[Admin Bootstrap] SUPER_ADMIN_ID/OWNER_ID and sales/masters.json are both missing. Admin OAuth login will be denied until an admin is seeded.');
+    }
 }
 
 async function getAdminAccount(userId) {

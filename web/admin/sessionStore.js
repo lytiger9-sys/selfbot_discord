@@ -8,6 +8,15 @@ const OAUTH_STATE_TTL_MS = 1000 * 60 * 10;
 const sessions = new Map();
 const oauthStates = new Map();
 
+function shouldUseSecureCookies() {
+    const configuredUrls = [
+        String(process.env.ADMIN_WEB_BASE_URL || '').trim(),
+        String(process.env.ADMIN_WEB_REDIRECT_URI || '').trim()
+    ].filter(Boolean);
+
+    return configuredUrls.some(url => /^https:\/\//i.test(url));
+}
+
 function parseCookies(cookieHeader = '') {
     return cookieHeader
         .split(';')
@@ -31,6 +40,10 @@ function serializeCookie(name, value, { maxAge = null } = {}) {
         'HttpOnly',
         'SameSite=Lax'
     ];
+
+    if (shouldUseSecureCookies()) {
+        parts.push('Secure');
+    }
 
     if (maxAge !== null) {
         parts.push(`Max-Age=${Math.max(0, Math.floor(maxAge))}`);

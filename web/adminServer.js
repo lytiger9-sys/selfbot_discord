@@ -176,6 +176,14 @@ function getRoleLandingPath(session) {
 }
 
 function mapLoginError(error) {
+    if (error.message === 'ADMIN_LOGIN_FORBIDDEN') {
+        return '관리자 권한이 없는 계정입니다. SUPER_ADMIN_ID 환경변수 또는 admin_accounts 설정을 확인해 주세요.';
+    }
+
+    if (error.message === 'DISCORD_OAUTH_STATE_INVALID') {
+        return '로그인 상태 검증에 실패했습니다. 배포 주소와 쿠키 설정을 확인해 주세요.';
+    }
+
     switch (error.message) {
     case 'OAUTH_NOT_CONFIGURED':
         return 'Discord OAuth 설정이 비어 있습니다.';
@@ -301,6 +309,7 @@ async function handleRequest(req, res) {
             appendSetCookie(res, serializeCookie(SESSION_COOKIE_NAME, sessionId, { maxAge: SESSION_TTL_MS / 1000 }));
             redirect(res, getRoleLandingPath({ isSuperAdmin }));
         } catch (error) {
+            console.error('[Admin OAuth Callback]', error.message);
             redirect(res, appendFlash('/admin/login', 'error', mapLoginError(error)));
         }
         return;

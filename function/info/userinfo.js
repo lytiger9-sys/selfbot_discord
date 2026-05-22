@@ -26,7 +26,7 @@ module.exports = {
                 : null;
 
             const content = buildTextCard({
-                accent: 'USER DOSSIER',
+                accent: 'USER PROFILE',
                 title: `${user.tag} 프로필`,
                 subtitle: targetId === message.author.id
                     ? '현재 계정의 기본 프로필 정보를 정리했습니다.'
