@@ -207,6 +207,14 @@ function describeError(error) {
     return { value: String(error) };
 }
 
+function tryBuildRequestUrl(req) {
+    try {
+        return new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    } catch (error) {
+        return null;
+    }
+}
+
 function getRoleLandingPath(session) {
     return session.isSuperAdmin ? '/admin/admins' : '/admin/licenses';
 }
@@ -292,7 +300,14 @@ async function requireSuperAdmin(res, session) {
 async function handleRequest(req, res) {
     cleanupExpiredOAuthStates();
 
-    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const url = tryBuildRequestUrl(req);
+    if (!url) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.end('Invalid request URL');
+        return;
+    }
+
     const session = getSession(req);
 
     if (req.method === 'GET' && url.pathname === '/') {
@@ -342,10 +357,22 @@ async function handleRequest(req, res) {
             }
 
             if (state !== stateCookie) {
+                if (session) {
+                    console.warn('[Admin OAuth Callback] stale callback ignored because an admin session already exists.');
+                    redirect(res, getRoleLandingPath(session));
+                    return;
+                }
+
                 throw new Error('DISCORD_OAUTH_STATE_COOKIE_MISMATCH');
             }
 
             if (!consumeOAuthState(state)) {
+                if (session) {
+                    console.warn('[Admin OAuth Callback] expired callback ignored because an admin session already exists.');
+                    redirect(res, getRoleLandingPath(session));
+                    return;
+                }
+
                 throw new Error('DISCORD_OAUTH_STATE_EXPIRED');
             }
 
