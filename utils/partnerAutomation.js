@@ -1,4 +1,5 @@
 const pool = require('../db');
+const { formatDateTime, toDate } = require('./dateTime');
 const {
     fetchChannel,
     isTextCommandChannel,
@@ -8,18 +9,6 @@ const {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const runningUsers = new Set();
 const schedulerIntervals = new WeakMap();
-
-function formatDateTime(value, fallback = '기록 없음') {
-    if (!value) return fallback;
-
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return fallback;
-
-    return new Intl.DateTimeFormat('ko-KR', {
-        dateStyle: 'medium',
-        timeStyle: 'short'
-    }).format(date);
-}
 
 async function getAutomationRow(userId) {
     const [rows] = await pool.execute(
@@ -37,6 +26,17 @@ async function setAutomationState(userId, enabled, lastSentAt = null) {
          ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), last_sent_at = VALUES(last_sent_at)`,
         [userId, enabled, lastSentAt]
     );
+}
+
+async function markAutomationSent(userId, enabled) {
+    await pool.execute(
+        `INSERT INTO partner_automation_settings (user_id, enabled, last_sent_at)
+         VALUES (?, ?, UTC_TIMESTAMP())
+         ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), last_sent_at = UTC_TIMESTAMP()`,
+        [userId, enabled]
+    );
+
+    return getAutomationRow(userId);
 }
 
 async function getPartnerOverview(userId) {
@@ -61,8 +61,9 @@ async function getPartnerOverview(userId) {
 function isDue(lastSentAt) {
     if (!lastSentAt) return true;
 
-    const last = lastSentAt instanceof Date ? lastSentAt : new Date(lastSentAt);
-    if (Number.isNaN(last.getTime())) return true;
+    const last = toDate(lastSentAt);
+    if (!last) return true;
+
     return Date.now() - last.getTime() >= DAY_MS;
 }
 
@@ -127,14 +128,13 @@ async function broadcastPartnerMessage(client, userId, { enableAutomation = true
             };
         }
 
-        const sentAt = new Date();
-        await setAutomationState(userId, enableAutomation, sentAt);
+        const updatedAutomation = await markAutomationSent(userId, enableAutomation);
 
         return {
             ok: true,
             successCount,
             failCount,
-            lastSentAt: sentAt
+            lastSentAt: updatedAutomation?.last_sent_at || null
         };
     } finally {
         runningUsers.delete(userId);

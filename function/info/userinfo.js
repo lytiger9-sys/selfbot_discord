@@ -1,21 +1,10 @@
 const { buildTextCard } = require('../../utils/premiumText');
 const { sendMessage, sendTemporaryMessage } = require('../../utils/commandUtils');
-
-function formatDate(value, fallback = '기록 없음') {
-    if (!value) return fallback;
-
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return fallback;
-
-    return new Intl.DateTimeFormat('ko-KR', {
-        dateStyle: 'medium',
-        timeStyle: 'short'
-    }).format(date);
-}
+const { formatDateTime } = require('../../utils/dateTime');
 
 module.exports = {
     name: '!정보',
-    description: '내 계정 또는 뒤에 붙인 디스코드 ID 대상의 프로필 기본 정보를 불러옵니다.\n사용 예시: `!정보` 또는 `!정보 123456789012345678`',
+    description: '계정 또는 입력한 디스코드 ID 대상의 기본 프로필 정보를 보여줍니다.\n사용 예시: `!정보` 또는 `!정보 123456789012345678`',
     async execute(message, args) {
         const targetId = args[0] || message.author.id;
 
@@ -42,23 +31,23 @@ module.exports = {
                     {
                         label: 'TIMELINE',
                         lines: [
-                            `• 디스코드 가입일: \`${formatDate(user.createdAt)}\``,
-                            `• 현재 서버 참여일: \`${formatDate(member?.joinedAt)}\``
+                            `• 디스코드 가입일: \`${formatDateTime(user.createdAt)}\``,
+                            `• 현재 서버 참여일: \`${formatDateTime(member?.joinedAt)}\``
                         ]
                     },
                     {
                         label: 'LINKS',
                         lines: [
-                            `• 아바타: ${user.displayAvatarURL({ dynamic: true, size: 512 })}`
+                            `• 프로필 이미지: ${user.displayAvatarURL({ dynamic: true, size: 512 })}`
                         ]
                     }
                 ],
-                footer: 'IP 주소와 배지 목록은 요청에 따라 제외했습니다.'
+                footer: 'IP 주소 등 민감한 정보는 제공하지 않습니다.'
             });
 
             await sendMessage(message.channel, content);
         } catch (error) {
-            await sendTemporaryMessage(message.channel, '❌ 해당 ID의 유저 정보를 불러오지 못했습니다.', 2000);
+            await sendTemporaryMessage(message.channel, '해당 ID의 유저 정보를 불러오지 못했습니다.', 2000);
         }
     }
 };

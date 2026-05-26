@@ -1,10 +1,12 @@
+require('dotenv').config();
+process.env.TZ = String(process.env.APP_TIMEZONE || process.env.TZ || 'Asia/Seoul').trim() || 'Asia/Seoul';
+
 const { initializePanelBot } = require('./sales/panels/panelBot');
 const { startAdminClientManager } = require('./utils/adminClientManager');
 const { ensureAdminBootstrap } = require('./utils/adminStore');
 const { startLicensedUserClientManager } = require('./utils/licensedUserManager');
 const { startAdminWebServer } = require('./web/adminServer');
 const pool = require('./db');
-require('dotenv').config();
 
 function describeStartupError(error) {
     if (error instanceof AggregateError) {

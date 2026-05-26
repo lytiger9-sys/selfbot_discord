@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const pool = require('../db');
 const { decrypt, encrypt } = require('../cryptoUtils');
+const { getDefaultTimeZone, toDate } = require('./dateTime');
 
 const adminIds = new Set();
 
@@ -66,12 +67,17 @@ function isMasterUser(userId) {
 function formatLegacyDate(value) {
     if (!value) return '';
 
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) {
+    const date = toDate(value);
+    if (!date) {
         return '';
     }
 
-    return date.toISOString().slice(0, 10);
+    return new Intl.DateTimeFormat('sv-SE', {
+        timeZone: getDefaultTimeZone(),
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(date);
 }
 
 async function syncLegacyAdminFile() {

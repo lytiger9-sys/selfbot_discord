@@ -34,6 +34,25 @@ function buildSslConfig() {
     return ssl;
 }
 
+function normalizeDbConnectionTimeZone(value) {
+    const raw = String(value || '').trim();
+    return raw || 'Z';
+}
+
+function normalizeDbSessionTimeZone(value) {
+    const raw = String(value || '').trim();
+    if (!raw || raw === 'Z') {
+        return '+00:00';
+    }
+
+    return raw;
+}
+
+const DB_CONNECTION_TIMEZONE = normalizeDbConnectionTimeZone(process.env.DB_TIMEZONE || 'Z');
+const DB_SESSION_TIMEZONE = normalizeDbSessionTimeZone(
+    process.env.DB_SESSION_TIMEZONE || DB_CONNECTION_TIMEZONE
+);
+
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     port: Number.parseInt(process.env.DB_PORT || '3306', 10),
@@ -41,12 +60,22 @@ const pool = mysql.createPool({
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'bot_db',
     ssl: buildSslConfig(),
+    charset: 'utf8mb4',
+    timezone: DB_CONNECTION_TIMEZONE,
     waitForConnections: true,
     connectionLimit: 10
 });
 
 let schemaEnsured = false;
 let schemaPromise = null;
+
+pool.on('connection', connection => {
+    connection.query('SET time_zone = ?', [DB_SESSION_TIMEZONE], error => {
+        if (error) {
+            console.warn('[DB Timezone]', error.message);
+        }
+    });
+});
 
 async function hasColumn(tableName, columnName) {
     const [rows] = await pool.execute(
@@ -86,12 +115,43 @@ async function ensureIndex(tableName, indexName, definitionSql) {
     await pool.execute(`ALTER TABLE ${tableName} ADD ${definitionSql}`);
 }
 
+async function ensureUtcSession() {
+    await pool.execute('SET time_zone = ?', [DB_SESSION_TIMEZONE]);
+}
+
+async function normalizeShiftedPartnerAutomationTimes() {
+    await pool.execute(
+        `UPDATE partner_automation_settings
+         SET last_sent_at = DATE_SUB(last_sent_at, INTERVAL 9 HOUR)
+         WHERE last_sent_at IS NOT NULL
+           AND last_sent_at > UTC_TIMESTAMP() + INTERVAL 1 HOUR`
+    );
+}
+
+async function normalizeShiftedPanelMessageTimes() {
+    await pool.execute(
+        `UPDATE panel_messages
+         SET last_refreshed_at = DATE_SUB(last_refreshed_at, INTERVAL 9 HOUR)
+         WHERE last_refreshed_at IS NOT NULL
+           AND last_refreshed_at > UTC_TIMESTAMP() + INTERVAL 1 HOUR`
+    );
+
+    await pool.execute(
+        `UPDATE panel_messages
+         SET last_seen_at = DATE_SUB(last_seen_at, INTERVAL 9 HOUR)
+         WHERE last_seen_at IS NOT NULL
+           AND last_seen_at > UTC_TIMESTAMP() + INTERVAL 1 HOUR`
+    );
+}
+
 async function migrateLicensesTable() {
     await ensureColumn('licenses', 'user_id', 'VARCHAR(50) DEFAULT NULL');
     await ensureColumn('licenses', 'token', 'TEXT DEFAULT NULL');
     await ensureColumn('licenses', 'start_date', 'DATETIME DEFAULT NULL');
     await ensureColumn('licenses', 'expiry_date', 'DATETIME DEFAULT NULL');
     await ensureColumn('licenses', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    await ensureIndex('licenses', 'idx_licenses_user_id', 'INDEX idx_licenses_user_id (user_id)');
+    await ensureIndex('licenses', 'idx_licenses_expiry_date', 'INDEX idx_licenses_expiry_date (expiry_date)');
 
     const hasUsedBy = await hasColumn('licenses', 'used_by');
     const hasUsedAt = await hasColumn('licenses', 'used_at');
@@ -209,12 +269,19 @@ async function migrateAdminAccountsTable() {
     await ensureColumn('admin_accounts', 'is_active', 'BOOLEAN DEFAULT TRUE');
     await ensureColumn('admin_accounts', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
     await ensureColumn('admin_accounts', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+    await ensureIndex('admin_accounts', 'idx_admin_accounts_is_active', 'INDEX idx_admin_accounts_is_active (is_active)');
 }
 
 async function migratePanelMessagesTable() {
     await ensureColumn('panel_messages', 'channel_id', 'VARCHAR(50) NOT NULL');
     await ensureColumn('panel_messages', 'last_refreshed_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
+    await ensureColumn('panel_messages', 'last_seen_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
     await ensureColumn('panel_messages', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    await ensureIndex(
+        'panel_messages',
+        'idx_panel_messages_last_refreshed_at',
+        'INDEX idx_panel_messages_last_refreshed_at (last_refreshed_at)'
+    );
 }
 
 async function migrateGuildDmBlockSettingsTable() {
@@ -227,6 +294,8 @@ async function ensureCoreSchema() {
     if (schemaPromise) return schemaPromise;
 
     schemaPromise = (async () => {
+        await ensureUtcSession();
+
         await pool.execute(`
             CREATE TABLE IF NOT EXISTS licenses (
                 id VARCHAR(50) PRIMARY KEY,
@@ -295,6 +364,7 @@ async function ensureCoreSchema() {
             'UNIQUE KEY unique_partner_channel_per_user (user_id, channel_id)'
         );
         await ensureColumn('partner_servers', 'created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+        await ensureIndex('partner_servers', 'idx_partner_servers_user_id', 'INDEX idx_partner_servers_user_id (user_id)');
 
         await pool.execute(`
             CREATE TABLE IF NOT EXISTS partner_automation_settings (
@@ -326,10 +396,12 @@ async function ensureCoreSchema() {
                 message_id VARCHAR(50) PRIMARY KEY,
                 channel_id VARCHAR(50) NOT NULL,
                 last_refreshed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
         await migratePanelMessagesTable();
+        await normalizeShiftedPanelMessageTimes();
 
         await pool.execute(`
             CREATE TABLE IF NOT EXISTS guild_dm_block_settings (
@@ -363,6 +435,8 @@ async function ensureCoreSchema() {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             )
         `);
+
+        await normalizeShiftedPartnerAutomationTimes();
 
         schemaEnsured = true;
     })().finally(() => {

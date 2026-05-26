@@ -138,7 +138,8 @@ function formatDate(value, fallback = '기록 없음') {
     if (Number.isNaN(date.getTime())) return fallback;
 
     return new Intl.DateTimeFormat('ko-KR', {
-        dateStyle: 'medium'
+        dateStyle: 'medium',
+        timeZone: process.env.APP_TIMEZONE || 'Asia/Seoul'
     }).format(date);
 }
 
@@ -150,7 +151,8 @@ function formatDateTime(value, fallback = '기록 없음') {
 
     return new Intl.DateTimeFormat('ko-KR', {
         dateStyle: 'medium',
-        timeStyle: 'short'
+        timeStyle: 'short',
+        timeZone: process.env.APP_TIMEZONE || 'Asia/Seoul'
     }).format(date);
 }
 

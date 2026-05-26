@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../../db');
+const { formatPreciseDateTime } = require('../../utils/dateTime');
 
 function escapeXml(value) {
     return String(value ?? '')
@@ -11,20 +12,7 @@ function escapeXml(value) {
 }
 
 function formatDateTime(value) {
-    if (!value) return '-';
-
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return '-';
-
-    return date.toLocaleString('ko-KR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    });
+    return formatPreciseDateTime(value, '-');
 }
 
 function getLicenseStatusLabel(row) {

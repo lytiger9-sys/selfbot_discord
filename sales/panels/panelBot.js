@@ -2,13 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const { Client, Collection, Intents } = require('discord.js');
 const { createPanel } = require('./embed/embedBuilders');
+const {
+    PANEL_REFRESH_CHECK_INTERVAL_MS,
+    PANEL_REFRESH_INTERVAL_HOURS
+} = require('./panelRefreshConfig');
 const { refreshTrackedPanels, trackPanelMessage } = require('./panelRefresher');
 const {
     getUserLicenseSummary,
     isLicenseActive
 } = require('../../utils/licenseUtils');
-
-const PANEL_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
 let panelBotClient = null;
 let panelBotReady = false;
@@ -95,7 +97,7 @@ function startPanelRefreshScheduler(client) {
 
     panelRefreshIntervalId = setInterval(() => {
         runPanelRefresh(client).catch(() => {});
-    }, PANEL_REFRESH_INTERVAL_MS);
+    }, PANEL_REFRESH_CHECK_INTERVAL_MS);
 
     runPanelRefresh(client).catch(() => {});
     return panelRefreshIntervalId;
@@ -105,6 +107,7 @@ function attachPanelBotEvents(client) {
     client.on('ready', () => {
         panelBotReady = true;
         startPanelRefreshScheduler(client);
+        console.log(`[PanelBot Refresh] tracked panels refresh every ${PANEL_REFRESH_INTERVAL_HOURS}h`);
         console.log(`[PanelBot] ${client.user.tag} 패널 봇이 준비되었습니다.`);
     });
 
