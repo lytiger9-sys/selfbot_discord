@@ -1,6 +1,6 @@
-const { sendTemporaryMessage } = require('../../utils/commandUtils');
-const { startCycleSpam } = require('./spam/cycle');
-const { startDurationSpam } = require('./spam/duration');
+const { sendTemporaryMessage } = require('../../../utils/commandUtils');
+const { startCycleSpam } = require('./cycle');
+const { startDurationSpam } = require('./duration');
 
 function parseSpamCommand(rawArgs) {
     const normalized = rawArgs.trim();
@@ -49,7 +49,7 @@ module.exports = {
             }
 
             startCycleSpam(message.channel, parsed.content, parsed.intervalMinutes, () => {
-                sendTemporaryMessage(message.channel, '도배 전송이 중단되었습니다.', 2500).catch(() => {});
+                sendTemporaryMessage(message.channel, '도배 전송 중 오류가 발생했습니다.', 2500).catch(() => {});
             });
             return;
         }
@@ -59,7 +59,7 @@ module.exports = {
         }
 
         startDurationSpam(message.channel, parsed.content, parsed.durationSeconds, () => {
-            sendTemporaryMessage(message.channel, '도배 전송이 중단되었습니다.', 2500).catch(() => {});
+            sendTemporaryMessage(message.channel, '도배 전송 중 오류가 발생했습니다.', 2500).catch(() => {});
         });
     }
 };

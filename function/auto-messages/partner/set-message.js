@@ -1,5 +1,5 @@
-const pool = require('../../db');
-const { fetchMessages, sendTemporaryMessage } = require('../../utils/commandUtils');
+const pool = require('../../../db');
+const { fetchMessages, sendTemporaryMessage } = require('../../../utils/commandUtils');
 
 module.exports = {
     name: '!파트너 메시지설정',

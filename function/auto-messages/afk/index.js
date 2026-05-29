@@ -1,6 +1,6 @@
-const pool = require('../../db');
-const { buildTextCard, escapeCodeBlock } = require('../../utils/premiumText');
-const { sendMessage } = require('../../utils/commandUtils');
+const pool = require('../../../db');
+const { buildTextCard, escapeCodeBlock } = require('../../../utils/premiumText');
+const { sendMessage } = require('../../../utils/commandUtils');
 
 module.exports = {
     name: '!afk',

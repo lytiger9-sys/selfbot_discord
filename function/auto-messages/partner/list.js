@@ -1,6 +1,6 @@
-const pool = require('../../db');
-const { buildTextCard, splitDiscordMessage } = require('../../utils/premiumText');
-const { fetchChannel, sendMessage, sendTemporaryMessage } = require('../../utils/commandUtils');
+const pool = require('../../../db');
+const { buildTextCard, splitDiscordMessage } = require('../../../utils/premiumText');
+const { fetchChannel, sendMessage, sendTemporaryMessage } = require('../../../utils/commandUtils');
 
 module.exports = {
     name: '!파트너 목록보기',

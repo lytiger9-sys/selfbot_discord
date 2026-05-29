@@ -1,5 +1,5 @@
-const { collectOwnMessages, deleteMessagesSequential } = require('../../utils/messageCleanup');
-const { sendTemporaryMessage } = require('../../utils/commandUtils');
+const { collectOwnMessages, deleteMessagesSequential } = require('../../../utils/messageCleanup');
+const { sendTemporaryMessage } = require('../../../utils/commandUtils');
 
 module.exports = {
     name: '!삭제 채널',

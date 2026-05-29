@@ -1,7 +1,37 @@
 const { isMasterUser } = require('./adminStore');
 
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+function delay(ms, signal = null) {
+    return new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+            const error = new Error('The operation was aborted.');
+            error.name = 'AbortError';
+            reject(error);
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            cleanup();
+            resolve();
+        }, ms);
+
+        const cleanup = () => {
+            clearTimeout(timeoutId);
+            if (signal) {
+                signal.removeEventListener('abort', onAbort);
+            }
+        };
+
+        const onAbort = () => {
+            cleanup();
+            const error = new Error('The operation was aborted.');
+            error.name = 'AbortError';
+            reject(error);
+        };
+
+        if (signal) {
+            signal.addEventListener('abort', onAbort, { once: true });
+        }
+    });
 }
 
 const fallbackQueueKey = {};
@@ -48,31 +78,49 @@ function getQueueState(scope) {
     return queueStates.get(key);
 }
 
-function runDiscordAction(action, spacingMs = 200, scope = null) {
+function runDiscordAction(action, spacingMs = 200, scope = null, signal = null) {
     const state = getQueueState(scope);
     const task = async () => {
+        if (signal?.aborted) {
+            return null;
+        }
+
         const now = Date.now();
         const waitMs = Math.max(0, state.nextAvailableAt - now);
 
         if (waitMs > 0) {
-            await delay(waitMs);
+            await delay(waitMs, signal);
+        }
+
+        if (signal?.aborted) {
+            return null;
         }
 
         state.nextAvailableAt = Date.now() + spacingMs;
+        if (signal?.aborted) {
+            return null;
+        }
+
         return action();
     };
 
     const pending = state.queue.then(task, task);
     state.queue = pending.catch(() => undefined);
-    return pending;
+    return pending.catch(error => {
+        if (error?.name === 'AbortError') {
+            return null;
+        }
+
+        throw error;
+    });
 }
 
-async function sendMessage(channel, payload) {
-    return runDiscordAction(() => channel.send(normalizePayload(payload)), 200, channel);
+async function sendMessage(channel, payload, signal = null) {
+    return runDiscordAction(() => channel.send(normalizePayload(payload)), 200, channel, signal);
 }
 
-async function replyMessage(message, payload) {
-    return runDiscordAction(() => message.reply(normalizePayload(payload)), 200, message);
+async function replyMessage(message, payload, signal = null) {
+    return runDiscordAction(() => message.reply(normalizePayload(payload)), 200, message, signal);
 }
 
 async function deleteMessage(target) {

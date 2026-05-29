@@ -1,5 +1,5 @@
-const pool = require('../../db');
-const { sendTemporaryMessage } = require('../../utils/commandUtils');
+const pool = require('../../../db');
+const { sendTemporaryMessage } = require('../../../utils/commandUtils');
 
 module.exports = {
     name: '!파트너 삭제',

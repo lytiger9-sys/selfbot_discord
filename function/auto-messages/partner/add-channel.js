@@ -1,9 +1,9 @@
-const pool = require('../../db');
+const pool = require('../../../db');
 const {
     fetchChannel,
     isTextCommandChannel,
     sendTemporaryMessage
-} = require('../../utils/commandUtils');
+} = require('../../../utils/commandUtils');
 
 module.exports = {
     name: '!파트너 서버설정',

@@ -2,8 +2,8 @@ const {
     collectRecentOwnMessagesFromChannels,
     deleteMessagesSequential,
     sortChannelsByActivity
-} = require('../../utils/messageCleanup');
-const { isTextCommandChannel, sendTemporaryMessage } = require('../../utils/commandUtils');
+} = require('../../../utils/messageCleanup');
+const { isTextCommandChannel, sendTemporaryMessage } = require('../../../utils/commandUtils');
 
 module.exports = {
     name: '!삭제 서버',

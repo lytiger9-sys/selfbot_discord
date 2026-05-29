@@ -1,5 +1,5 @@
-const { sendTemporaryMessage } = require('../../utils/commandUtils');
-const { getPartnerOverview, setAutomationState } = require('../../utils/partnerAutomation');
+const { sendTemporaryMessage } = require('../../../utils/commandUtils');
+const { getPartnerOverview, setAutomationState } = require('../../../utils/partnerAutomation');
 
 module.exports = {
     name: '!파트너 중지',

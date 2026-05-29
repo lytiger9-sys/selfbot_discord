@@ -1,6 +1,6 @@
-const { buildTextCard } = require('../../utils/premiumText');
-const { sendMessage } = require('../../utils/commandUtils');
-const { formatDateTime, getPartnerOverview } = require('../../utils/partnerAutomation');
+const { buildTextCard } = require('../../../utils/premiumText');
+const { sendMessage } = require('../../../utils/commandUtils');
+const { formatDateTime, getPartnerOverview } = require('../../../utils/partnerAutomation');
 
 module.exports = {
     name: '!파트너',
