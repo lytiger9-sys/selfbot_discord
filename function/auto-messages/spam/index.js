@@ -1,6 +1,6 @@
 const { sendTemporaryMessage } = require('../../../utils/commandUtils');
 const { startCycleSpam } = require('./cycle');
-const { startDurationSpam } = require('./duration');
+const { startCountSpam } = require('./count');
 
 function parseSpamCommand(rawArgs) {
     const normalized = rawArgs.trim();
@@ -14,12 +14,12 @@ function parseSpamCommand(rawArgs) {
         };
     }
 
-    const durationMatch = normalized.match(/^기한\s+([0-9]+)\s*(?:초)?\s+([\s\S]+)$/);
-    if (durationMatch) {
+    const countMatch = normalized.match(/^횟수\s+([0-9]+)\s*(?:회|개)?\s+([\s\S]+)$/);
+    if (countMatch) {
         return {
-            content: durationMatch[2].trim(),
-            durationSeconds: Number.parseInt(durationMatch[1], 10),
-            mode: 'duration'
+            content: countMatch[2].trim(),
+            repeatCount: Number.parseInt(countMatch[1], 10),
+            mode: 'count'
         };
     }
 
@@ -29,14 +29,14 @@ function parseSpamCommand(rawArgs) {
 function sendUsage(message) {
     return sendTemporaryMessage(
         message.channel,
-        '사용법: `!도배 주기 x분 [메시지]` 또는 `!도배 기한 x초 [메시지]`',
+        '사용법: `!도배 주기 x분 [메시지]` 또는 `!도배 횟수 x회 [메시지]`',
         2500
     );
 }
 
 module.exports = {
     name: '!도배',
-    description: '도배 메시지를 반복 전송합니다.\n사용법: `!도배 주기 x분 [메시지]`\n사용법: `!도배 기한 x초 [메시지]`',
+    description: '도배 메시지를 반복 전송합니다.\n사용법: `!도배 주기 x분 [메시지]`\n사용법: `!도배 횟수 x회 [메시지]`',
     async execute(message, args, rawArgs) {
         const parsed = parseSpamCommand(rawArgs);
         if (!parsed || !parsed.content) {
@@ -54,11 +54,11 @@ module.exports = {
             return;
         }
 
-        if (!Number.isFinite(parsed.durationSeconds) || parsed.durationSeconds <= 0) {
+        if (!Number.isFinite(parsed.repeatCount) || parsed.repeatCount <= 0) {
             return sendUsage(message);
         }
 
-        startDurationSpam(message.channel, parsed.content, parsed.durationSeconds, () => {
+        startCountSpam(message.channel, parsed.content, parsed.repeatCount, () => {
             sendTemporaryMessage(message.channel, '도배 전송 중 오류가 발생했습니다.', 2500).catch(() => {});
         });
     }

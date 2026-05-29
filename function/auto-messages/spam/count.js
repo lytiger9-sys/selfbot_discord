@@ -1,25 +1,20 @@
 const { delay, sendMessage } = require('../../../utils/commandUtils');
 const { createSpamJob } = require('../../../utils/spamAutomation');
 
-function startDurationSpam(channel, content, durationSeconds, onError) {
-    const stopAt = Date.now() + Math.max(1, durationSeconds) * 1000;
+function startCountSpam(channel, content, repeatCount, onError) {
+    const totalCount = Math.max(1, Math.trunc(repeatCount));
     const job = createSpamJob(channel.client);
 
     void (async () => {
         try {
-            while (!job.signal.aborted && Date.now() < stopAt) {
+            for (let sentCount = 0; sentCount < totalCount && !job.signal.aborted; sentCount += 1) {
                 await sendMessage(channel, content, job.signal);
 
-                if (job.signal.aborted) {
+                if (job.signal.aborted || sentCount >= totalCount - 1) {
                     break;
                 }
 
-                const waitMs = Math.min(1000, stopAt - Date.now());
-                if (waitMs <= 0) {
-                    break;
-                }
-
-                await delay(waitMs, job.signal);
+                await delay(1000, job.signal);
             }
         } catch (error) {
             if (!job.signal.aborted) {
@@ -29,7 +24,7 @@ function startDurationSpam(channel, content, durationSeconds, onError) {
             job.release();
         }
     })().catch(error => {
-        console.error('[SpamDuration]', error?.message || error);
+        console.error('[SpamCount]', error?.message || error);
         if (typeof onError === 'function') {
             onError(error);
         }
@@ -37,5 +32,5 @@ function startDurationSpam(channel, content, durationSeconds, onError) {
 }
 
 module.exports = {
-    startDurationSpam
+    startCountSpam
 };
