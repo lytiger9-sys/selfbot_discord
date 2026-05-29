@@ -188,6 +188,7 @@ async function migrateUserSettingsTable() {
     await ensureColumn('user_settings', 'rpc_text_1', 'TEXT');
     await ensureColumn('user_settings', 'rpc_text_2', 'TEXT');
     await ensureColumn('user_settings', 'streaming_details', 'TEXT');
+    await ensureColumn('user_settings', 'streaming_url', 'TEXT DEFAULT NULL');
     await ensureColumn('user_settings', 'streaming_elapsed_seconds', 'INT DEFAULT NULL');
     await ensureColumn('user_settings', 'streaming_button_label', 'VARCHAR(64) DEFAULT NULL');
     await ensureColumn('user_settings', 'streaming_button_url', 'TEXT DEFAULT NULL');
@@ -231,6 +232,12 @@ async function migrateUserSettingsTable() {
             OR rpc_elapsed_seconds_2 IS NOT NULL
             OR rpc_button_label_2 IS NOT NULL
             OR rpc_button_url_2 IS NOT NULL`
+    );
+
+    await pool.execute(
+        `UPDATE user_settings
+         SET streaming_url = COALESCE(streaming_url, streaming_button_url)
+         WHERE streaming_button_url IS NOT NULL`
     );
 
     await pool.execute(
@@ -318,6 +325,7 @@ async function ensureCoreSchema() {
                 partner_message TEXT,
                 streaming_text TEXT,
                 streaming_details TEXT,
+                streaming_url TEXT,
                 streaming_elapsed_seconds INT DEFAULT NULL,
                 streaming_button_label VARCHAR(64) DEFAULT NULL,
                 streaming_button_url TEXT,

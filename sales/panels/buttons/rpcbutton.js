@@ -1,6 +1,10 @@
 const { MessageActionRow, TextInputComponent } = require('discord.js');
 const pool = require('../../../db');
 const { normalizeButtonPair } = require('../../../utils/activitySettings');
+const {
+    ACTIVITY_PANEL_VALIDATION_TEXT,
+    RPC_BUTTON_PANEL_TEXT
+} = require('../../../utils/activityPanelText');
 const { fetchActivityUserSettings, toModalValue } = require('../../../utils/activityUserSettings');
 const { refreshLicensedUserPresence } = require('../../../utils/licensedUserManager');
 const { createPanelModal } = require('../../../utils/panelModal');
@@ -13,41 +17,41 @@ module.exports = {
         const current = await fetchActivityUserSettings(interaction.user.id);
         const modal = createPanelModal(interaction, {
             customId: 'rpc_button_modal',
-            title: 'RPC 버튼 설정',
+            title: RPC_BUTTON_PANEL_TEXT.modalTitle,
             components: [
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
                         .setCustomId('rpc_button_label_1')
-                        .setLabel('버튼 1 이름')
+                        .setLabel(RPC_BUTTON_PANEL_TEXT.firstLabelName)
                         .setStyle('SHORT')
-                        .setPlaceholder('예: Prime Service')
+                        .setPlaceholder(RPC_BUTTON_PANEL_TEXT.firstLabelPlaceholder)
                         .setRequired(false)
                         .setValue(toModalValue(current.rpc_button_label_1))
                 ),
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
                         .setCustomId('rpc_button_url_1')
-                        .setLabel('버튼 1 링크')
+                        .setLabel(RPC_BUTTON_PANEL_TEXT.firstUrlLabel)
                         .setStyle('SHORT')
-                        .setPlaceholder('https://example.com')
+                        .setPlaceholder(RPC_BUTTON_PANEL_TEXT.firstUrlPlaceholder)
                         .setRequired(false)
                         .setValue(toModalValue(current.rpc_button_url_1))
                 ),
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
                         .setCustomId('rpc_button_label_2')
-                        .setLabel('버튼 2 이름')
+                        .setLabel(RPC_BUTTON_PANEL_TEXT.secondLabelName)
                         .setStyle('SHORT')
-                        .setPlaceholder('선택 입력')
+                        .setPlaceholder(RPC_BUTTON_PANEL_TEXT.secondLabelPlaceholder)
                         .setRequired(false)
                         .setValue(toModalValue(current.rpc_button_label_2))
                 ),
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
                         .setCustomId('rpc_button_url_2')
-                        .setLabel('버튼 2 링크')
+                        .setLabel(RPC_BUTTON_PANEL_TEXT.secondUrlLabel)
                         .setStyle('SHORT')
-                        .setPlaceholder('https://example.com')
+                        .setPlaceholder(RPC_BUTTON_PANEL_TEXT.secondUrlPlaceholder)
                         .setRequired(false)
                         .setValue(toModalValue(current.rpc_button_url_2))
                 )
@@ -93,15 +97,15 @@ module.exports = {
             await refreshLicensedUserPresence(interaction.user.id).catch(() => {});
 
             await interaction.reply({
-                content: 'RPC 버튼 설정을 저장했습니다.',
+                content: RPC_BUTTON_PANEL_TEXT.saved,
                 ephemeral: true
             });
         } catch (error) {
             const message = error.message === 'BUTTON_PAIR_INCOMPLETE'
-                ? '버튼 이름과 링크를 각각 같이 입력하거나 둘 다 비워 주세요.'
+                ? ACTIVITY_PANEL_VALIDATION_TEXT.incompleteButtonPair
                 : error.message === 'BUTTON_URL_INVALID'
-                    ? '버튼 링크는 `https://` 또는 `http://` 형식이어야 합니다.'
-                    : 'RPC 버튼 저장 중 오류가 발생했습니다.';
+                    ? ACTIVITY_PANEL_VALIDATION_TEXT.invalidButtonUrl
+                    : RPC_BUTTON_PANEL_TEXT.saveFailed;
 
             await interaction.reply({
                 content: message,

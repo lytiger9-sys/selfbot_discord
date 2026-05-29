@@ -35,12 +35,28 @@ function normalizeStoredButtons(...candidates) {
     return buttons.slice(0, 2);
 }
 
-function pickPrimaryLinkUrl(buttons = []) {
-    if (!Array.isArray(buttons) || buttons.length === 0) {
-        return null;
+function detectStreamingPlatformLabel(url) {
+    const normalizedUrl = normalizeOptionalText(url);
+
+    if (!normalizedUrl) {
+        return 'Streaming';
     }
 
-    return normalizeOptionalText(buttons[0]?.url);
+    try {
+        const host = new URL(normalizedUrl).hostname.toLowerCase();
+
+        if (['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(host)) {
+            return 'YouTube';
+        }
+
+        if (['twitch.tv', 'www.twitch.tv', 'm.twitch.tv'].includes(host)) {
+            return 'Twitch';
+        }
+    } catch (error) {
+        // Ignore invalid URL payloads here. Validation happens earlier.
+    }
+
+    return 'Streaming';
 }
 
 function normalizeProfileSettings(row = {}) {
@@ -48,6 +64,7 @@ function normalizeProfileSettings(row = {}) {
         streaming: {
             title: normalizeOptionalText(row.streaming_text),
             details: normalizeOptionalText(row.streaming_details),
+            url: normalizeOptionalText(row.streaming_url),
             elapsedSeconds: normalizeOptionalInteger(row.streaming_elapsed_seconds),
             largeImageUrl: normalizeOptionalText(row.streaming_large_image_url),
             smallImageUrl: normalizeOptionalText(row.streaming_small_image_url),
@@ -75,31 +92,29 @@ function buildStreamingDescriptor(settings, index) {
         activityId: 'vc-streaming',
         type: 'STREAMING',
         index,
-        title: settings.title,
-        details: settings.details,
-        // Prefer the clickable button area for streaming activities.
-        elapsedSeconds: null,
+        name: detectStreamingPlatformLabel(settings.url),
+        details: settings.title,
+        state: settings.details,
+        url: settings.url,
+        elapsedSeconds: settings.elapsedSeconds,
         largeImageUrl: settings.largeImageUrl,
         smallImageUrl: settings.smallImageUrl,
-        buttons: settings.buttons,
-        url: pickPrimaryLinkUrl(settings.buttons)
+        buttons: settings.buttons
     };
 }
 
 function buildRpcDescriptor(settings, index) {
-    const hasElapsedTimer = Number.isInteger(settings.elapsedSeconds) && settings.elapsedSeconds >= 0;
-
     return {
         activityId: 'vc-rpc',
         type: 'PLAYING',
         index,
-        title: settings.title,
+        name: settings.title,
         details: settings.details,
+        state: null,
         elapsedSeconds: settings.elapsedSeconds,
         largeImageUrl: settings.largeImageUrl,
         smallImageUrl: settings.smallImageUrl,
-        // When an RPC timer exists, omit buttons so Discord can keep the timer line visible.
-        buttons: hasElapsedTimer ? [] : settings.buttons,
+        buttons: settings.buttons,
         url: null
     };
 }
@@ -144,13 +159,12 @@ function applyElapsedTimestamp(activity, elapsedSeconds) {
 
 function assignActivityIdentity(activity, activityId, index) {
     activity.id = activityId;
-    activity.sessionId = activityId;
     activity.createdTimestamp = Date.now() + index;
 }
 
 function createActivity(client, descriptor) {
     const activity = new RichPresence(client)
-        .setName(descriptor.title)
+        .setName(descriptor.name)
         .setType(descriptor.type);
 
     assignActivityIdentity(activity, descriptor.activityId, descriptor.index);
@@ -167,6 +181,10 @@ function createActivity(client, descriptor) {
         activity.setDetails(descriptor.details);
     }
 
+    if (descriptor.state) {
+        activity.setState(descriptor.state);
+    }
+
     applyElapsedTimestamp(activity, descriptor.elapsedSeconds);
     applyActivityAssets(activity, descriptor);
     applyActivityButtons(activity, descriptor.buttons);
@@ -177,7 +195,7 @@ function createActivity(client, descriptor) {
 function buildActivities(client, settings) {
     const descriptors = [];
 
-    if (settings.streaming.title) {
+    if (settings.streaming.title && settings.streaming.url) {
         descriptors.push(buildStreamingDescriptor(settings.streaming, descriptors.length));
     }
 
@@ -190,7 +208,7 @@ function buildActivities(client, settings) {
 
 function buildSettingsSignature(settings) {
     return JSON.stringify({
-        presenceVersion: 11,
+        presenceVersion: 13,
         applicationId: DEFAULT_APPLICATION_ID,
         settings
     });
@@ -203,6 +221,7 @@ async function applyStoredProfileSettings(client, { force = false } = {}) {
         `SELECT
             streaming_text,
             streaming_details,
+            streaming_url,
             streaming_elapsed_seconds,
             streaming_button_label,
             streaming_button_url,

@@ -1,4 +1,5 @@
 const pool = require('../../../db');
+const { ACTIVITY_PANEL_STATUS_TEXT } = require('../../../utils/activityPanelText');
 const { refreshLicensedUserPresence } = require('../../../utils/licensedUserManager');
 
 module.exports = {
@@ -10,6 +11,7 @@ module.exports = {
                 user_id,
                 streaming_text,
                 streaming_details,
+                streaming_url,
                 streaming_elapsed_seconds,
                 streaming_button_label,
                 streaming_button_url,
@@ -31,10 +33,11 @@ module.exports = {
                 rpc_details_2,
                 rpc_elapsed_seconds_2
             )
-             VALUES (?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+             VALUES (?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
              ON DUPLICATE KEY UPDATE
              streaming_text = NULL,
              streaming_details = NULL,
+             streaming_url = NULL,
              streaming_elapsed_seconds = NULL,
              streaming_button_label = NULL,
              streaming_button_url = NULL,
@@ -60,7 +63,7 @@ module.exports = {
         await refreshLicensedUserPresence(interaction.user.id).catch(() => {});
 
         await interaction.reply({
-            content: '스트리밍과 RPC 활동을 모두 중지했습니다.',
+            content: ACTIVITY_PANEL_STATUS_TEXT.clearedAll,
             ephemeral: true
         });
     }

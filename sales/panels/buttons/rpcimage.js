@@ -1,6 +1,7 @@
 const { MessageActionRow, TextInputComponent } = require('discord.js');
 const pool = require('../../../db');
 const { normalizeOptionalText } = require('../../../utils/activitySettings');
+const { RPC_IMAGE_PANEL_TEXT } = require('../../../utils/activityPanelText');
 const { fetchActivityUserSettings, toModalValue } = require('../../../utils/activityUserSettings');
 const { refreshLicensedUserPresence } = require('../../../utils/licensedUserManager');
 const { createPanelModal } = require('../../../utils/panelModal');
@@ -13,23 +14,23 @@ module.exports = {
         const current = await fetchActivityUserSettings(interaction.user.id);
         const modal = createPanelModal(interaction, {
             customId: 'rpc_image_modal',
-            title: 'RPC 사진 설정',
+            title: RPC_IMAGE_PANEL_TEXT.modalTitle,
             components: [
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
                         .setCustomId('rpc_large_image_url')
-                        .setLabel('큰 이미지 URL')
+                        .setLabel(RPC_IMAGE_PANEL_TEXT.largeImageLabel)
                         .setStyle('SHORT')
-                        .setPlaceholder('https://cdn.discordapp.com/... 또는 asset id')
+                        .setPlaceholder(RPC_IMAGE_PANEL_TEXT.imagePlaceholder)
                         .setRequired(false)
                         .setValue(toModalValue(current.rpc_large_image_url))
                 ),
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
                         .setCustomId('rpc_small_image_url')
-                        .setLabel('작은 이미지 URL')
+                        .setLabel(RPC_IMAGE_PANEL_TEXT.smallImageLabel)
                         .setStyle('SHORT')
-                        .setPlaceholder('https://cdn.discordapp.com/... 또는 asset id')
+                        .setPlaceholder(RPC_IMAGE_PANEL_TEXT.imagePlaceholder)
                         .setRequired(false)
                         .setValue(toModalValue(current.rpc_small_image_url))
                 )
@@ -57,7 +58,7 @@ module.exports = {
         await refreshLicensedUserPresence(interaction.user.id).catch(() => {});
 
         await interaction.reply({
-            content: 'RPC 사진 설정을 저장했습니다. 비워 두면 해당 이미지는 제거됩니다.',
+            content: RPC_IMAGE_PANEL_TEXT.saved,
             ephemeral: true
         });
     }

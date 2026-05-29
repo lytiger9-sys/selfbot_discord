@@ -76,9 +76,59 @@ function isValidUrl(url) {
     }
 }
 
+function isSupportedStreamingUrl(url) {
+    if (!url) {
+        return false;
+    }
+
+    try {
+        const parsed = new URL(String(url));
+        const host = parsed.hostname.toLowerCase();
+
+        return [
+            'twitch.tv',
+            'www.twitch.tv',
+            'm.twitch.tv',
+            'youtube.com',
+            'www.youtube.com',
+            'm.youtube.com'
+        ].includes(host);
+    } catch (error) {
+        return false;
+    }
+}
+
+function normalizeOptionalUrl(value, invalidCode = 'URL_INVALID') {
+    const url = normalizeOptionalText(value);
+
+    if (!url) {
+        return null;
+    }
+
+    if (!isValidUrl(url)) {
+        throw new Error(invalidCode);
+    }
+
+    return url;
+}
+
+function normalizeStreamingUrl(value) {
+    const url = normalizeOptionalUrl(value, 'STREAMING_URL_INVALID');
+
+    if (!url) {
+        throw new Error('STREAMING_URL_REQUIRED');
+    }
+
+    if (!isSupportedStreamingUrl(url)) {
+        throw new Error('STREAMING_URL_INVALID');
+    }
+
+    return url;
+}
+
 function normalizeButtonPair(labelValue, urlValue) {
     const label = normalizeOptionalText(labelValue);
-    const url = normalizeOptionalText(urlValue);
+    const url = normalizeOptionalUrl(urlValue, 'BUTTON_URL_INVALID');
 
     if (!label && !url) {
         return null;
@@ -98,8 +148,11 @@ function normalizeButtonPair(labelValue, urlValue) {
 module.exports = {
     formatElapsedSeconds,
     isValidUrl,
+    isSupportedStreamingUrl,
     normalizeButtonPair,
     normalizeOptionalInteger,
     normalizeOptionalText,
+    normalizeOptionalUrl,
+    normalizeStreamingUrl,
     parseElapsedInput
 };

@@ -1,6 +1,7 @@
 const { MessageActionRow, TextInputComponent } = require('discord.js');
 const pool = require('../../../db');
 const { normalizeOptionalText } = require('../../../utils/activitySettings');
+const { STREAMING_IMAGE_PANEL_TEXT } = require('../../../utils/activityPanelText');
 const { fetchActivityUserSettings, toModalValue } = require('../../../utils/activityUserSettings');
 const { refreshLicensedUserPresence } = require('../../../utils/licensedUserManager');
 const { createPanelModal } = require('../../../utils/panelModal');
@@ -13,23 +14,23 @@ module.exports = {
         const current = await fetchActivityUserSettings(interaction.user.id);
         const modal = createPanelModal(interaction, {
             customId: 'streaming_image_modal',
-            title: '스트리밍 사진 설정',
+            title: STREAMING_IMAGE_PANEL_TEXT.modalTitle,
             components: [
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
                         .setCustomId('streaming_large_image_url')
-                        .setLabel('큰 이미지 URL')
+                        .setLabel(STREAMING_IMAGE_PANEL_TEXT.largeImageLabel)
                         .setStyle('SHORT')
-                        .setPlaceholder('https://cdn.discordapp.com/... 또는 asset id')
+                        .setPlaceholder(STREAMING_IMAGE_PANEL_TEXT.imagePlaceholder)
                         .setRequired(false)
                         .setValue(toModalValue(current.streaming_large_image_url))
                 ),
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
                         .setCustomId('streaming_small_image_url')
-                        .setLabel('작은 이미지 URL')
+                        .setLabel(STREAMING_IMAGE_PANEL_TEXT.smallImageLabel)
                         .setStyle('SHORT')
-                        .setPlaceholder('https://cdn.discordapp.com/... 또는 asset id')
+                        .setPlaceholder(STREAMING_IMAGE_PANEL_TEXT.imagePlaceholder)
                         .setRequired(false)
                         .setValue(toModalValue(current.streaming_small_image_url))
                 )
@@ -57,7 +58,7 @@ module.exports = {
         await refreshLicensedUserPresence(interaction.user.id).catch(() => {});
 
         await interaction.reply({
-            content: '스트리밍 사진 설정을 저장했습니다. 비워 두면 해당 이미지는 제거됩니다.',
+            content: STREAMING_IMAGE_PANEL_TEXT.saved,
             ephemeral: true
         });
     }

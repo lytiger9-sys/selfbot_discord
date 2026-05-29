@@ -1,4 +1,5 @@
 const pool = require('../../../db');
+const { STREAMING_PANEL_TEXT } = require('../../../utils/activityPanelText');
 const { refreshLicensedUserPresence } = require('../../../utils/licensedUserManager');
 
 module.exports = {
@@ -10,6 +11,7 @@ module.exports = {
                 user_id,
                 streaming_text,
                 streaming_details,
+                streaming_url,
                 streaming_elapsed_seconds,
                 streaming_button_label,
                 streaming_button_url,
@@ -18,10 +20,11 @@ module.exports = {
                 streaming_large_image_url,
                 streaming_small_image_url
             )
-             VALUES (?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+             VALUES (?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
              ON DUPLICATE KEY UPDATE
              streaming_text = NULL,
              streaming_details = NULL,
+             streaming_url = NULL,
              streaming_elapsed_seconds = NULL,
              streaming_button_label = NULL,
              streaming_button_url = NULL,
@@ -34,7 +37,7 @@ module.exports = {
         await refreshLicensedUserPresence(interaction.user.id).catch(() => {});
 
         await interaction.reply({
-            content: '스트리밍 활동을 중지했습니다.',
+            content: STREAMING_PANEL_TEXT.cleared,
             ephemeral: true
         });
     }

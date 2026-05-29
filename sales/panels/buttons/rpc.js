@@ -5,6 +5,10 @@ const {
     normalizeOptionalText,
     parseElapsedInput
 } = require('../../../utils/activitySettings');
+const {
+    ACTIVITY_PANEL_VALIDATION_TEXT,
+    RPC_PANEL_TEXT
+} = require('../../../utils/activityPanelText');
 const { fetchActivityUserSettings, toModalValue } = require('../../../utils/activityUserSettings');
 const { refreshLicensedUserPresence } = require('../../../utils/licensedUserManager');
 const { createPanelModal } = require('../../../utils/panelModal');
@@ -17,32 +21,32 @@ module.exports = {
         const current = await fetchActivityUserSettings(interaction.user.id);
         const modal = createPanelModal(interaction, {
             customId: 'rpc_modal',
-            title: 'RPC 설정',
+            title: RPC_PANEL_TEXT.modalTitle,
             components: [
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
                         .setCustomId('rpc_text_1')
-                        .setLabel('제목')
+                        .setLabel(RPC_PANEL_TEXT.titleLabel)
                         .setStyle('SHORT')
-                        .setPlaceholder('예: Visual Studio Code')
+                        .setPlaceholder(RPC_PANEL_TEXT.titlePlaceholder)
                         .setRequired(true)
                         .setValue(toModalValue(current.rpc_text_1 || current.rpc_text))
                 ),
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
                         .setCustomId('rpc_details_1')
-                        .setLabel('세부설명')
+                        .setLabel(RPC_PANEL_TEXT.detailsLabel)
                         .setStyle('SHORT')
-                        .setPlaceholder('선택 입력')
+                        .setPlaceholder(RPC_PANEL_TEXT.detailsPlaceholder)
                         .setRequired(false)
                         .setValue(toModalValue(current.rpc_details_1))
                 ),
                 new MessageActionRow().addComponents(
                     new TextInputComponent()
                         .setCustomId('rpc_elapsed_1')
-                        .setLabel('경과 시간')
+                        .setLabel(RPC_PANEL_TEXT.elapsedLabel)
                         .setStyle('SHORT')
-                        .setPlaceholder('24:53:01 또는 53:01')
+                        .setPlaceholder(RPC_PANEL_TEXT.elapsedPlaceholder)
                         .setRequired(false)
                         .setValue(toModalValue(formatElapsedSeconds(current.rpc_elapsed_seconds_1)))
                 )
@@ -89,13 +93,13 @@ module.exports = {
 
             const elapsedText = formatElapsedSeconds(elapsedSeconds);
             await interaction.reply({
-                content: `RPC를 "${title}"로 저장했습니다.${elapsedText ? ` 경과 시간 ${elapsedText}도 반영했습니다.` : ''}`,
+                content: `${RPC_PANEL_TEXT.saved} "${title}"${elapsedText ? ` (경과 시간 ${elapsedText})` : ''}`,
                 ephemeral: true
             });
         } catch (error) {
             const message = error.message === 'ELAPSED_TIME_INVALID'
-                ? '경과 시간은 `24:53:01` 또는 `53:01` 형식으로 입력해 주세요.'
-                : 'RPC 설정 저장 중 오류가 발생했습니다.';
+                ? ACTIVITY_PANEL_VALIDATION_TEXT.invalidElapsed
+                : RPC_PANEL_TEXT.saveFailed;
 
             await interaction.reply({
                 content: message,

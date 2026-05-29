@@ -1,4 +1,5 @@
 const pool = require('../../../db');
+const { RPC_PANEL_TEXT } = require('../../../utils/activityPanelText');
 const { refreshLicensedUserPresence } = require('../../../utils/licensedUserManager');
 
 module.exports = {
@@ -42,7 +43,7 @@ module.exports = {
         await refreshLicensedUserPresence(interaction.user.id).catch(() => {});
 
         await interaction.reply({
-            content: 'RPC 활동을 중지했습니다.',
+            content: RPC_PANEL_TEXT.cleared,
             ephemeral: true
         });
     }
