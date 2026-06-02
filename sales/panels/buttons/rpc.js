@@ -93,7 +93,7 @@ module.exports = {
 
             const elapsedText = formatElapsedSeconds(elapsedSeconds);
             await interaction.reply({
-                content: `${RPC_PANEL_TEXT.saved} "${title}"${elapsedText ? ` (경과 시간 ${elapsedText})` : ''}`,
+                content: `${RPC_PANEL_TEXT.saved} "${title}"${elapsedText ? ` (플레이타임 ${elapsedText})` : ''}`,
                 ephemeral: true
             });
         } catch (error) {

@@ -29,9 +29,9 @@ const RPC_PANEL_TEXT = Object.freeze({
     modalTitle: 'RPC 설정',
     titleLabel: '제목',
     titlePlaceholder: '예: Visual Studio Code',
-    detailsLabel: '설명',
-    detailsPlaceholder: '선택 입력',
-    elapsedLabel: '경과 시간',
+    detailsLabel: '세부설명',
+    detailsPlaceholder: '예: 화면에 표시할 세부 설명',
+    elapsedLabel: '플레이타임',
     elapsedPlaceholder: '24:53:01 또는 53:01',
     saved: 'RPC를 설정했습니다.',
     cleared: 'RPC 활동을 중지했습니다.',
@@ -54,11 +54,11 @@ const STREAMING_BUTTON_PANEL_TEXT = Object.freeze({
 
 const RPC_BUTTON_PANEL_TEXT = Object.freeze({
     modalTitle: 'RPC 버튼 설정',
-    firstLabelName: '버튼 1 이름',
+    firstLabelName: '버튼 1 글씨',
     firstLabelPlaceholder: '예: Prime Service',
     firstUrlLabel: '버튼 1 링크',
     firstUrlPlaceholder: 'https://example.com',
-    secondLabelName: '버튼 2 이름',
+    secondLabelName: '버튼 2 글씨',
     secondLabelPlaceholder: '선택 입력',
     secondUrlLabel: '버튼 2 링크',
     secondUrlPlaceholder: 'https://example.com',
@@ -76,8 +76,8 @@ const STREAMING_IMAGE_PANEL_TEXT = Object.freeze({
 
 const RPC_IMAGE_PANEL_TEXT = Object.freeze({
     modalTitle: 'RPC 사진 설정',
-    largeImageLabel: '큰 이미지 URL',
-    smallImageLabel: '작은 이미지 URL',
+    largeImageLabel: '큰 사진 URL',
+    smallImageLabel: '작은 사진 URL',
     imagePlaceholder: 'https://cdn.discordapp.com/... 또는 asset id',
     saved: 'RPC 사진 설정을 저장했습니다. 비우면 해당 이미지를 제거합니다.'
 });

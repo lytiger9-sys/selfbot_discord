@@ -26,6 +26,12 @@ function loadRecursive(baseDir, collection) {
         try {
             const item = require(filePath);
             if (item?.name) {
+                Object.defineProperty(item, '__sourcePath', {
+                    configurable: true,
+                    enumerable: false,
+                    value: path.relative(path.join(__dirname, '..'), filePath),
+                    writable: true
+                });
                 collection.set(item.name, item);
             }
         } catch (error) {

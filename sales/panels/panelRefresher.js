@@ -1,4 +1,5 @@
-const { createPanel } = require('./embed/embedBuilders');
+const { createPanel } = require('./panelLayoutV2');
+const { editPanelMessage } = require('./panelDiscordApi');
 const {
     deletePanelMessage,
     fetchPanelMessagesNeedingRefresh,
@@ -18,24 +19,12 @@ async function trackPanelMessage(channelId, messageId) {
     await savePanelMessage(channelId, messageId);
 }
 
-async function refreshTrackedPanels(client) {
+async function refreshTrackedPanels() {
     const trackedMessages = await fetchPanelMessagesNeedingRefresh();
 
     for (const tracked of trackedMessages) {
         try {
-            const channel = await client.channels.fetch(tracked.channel_id);
-            if (!channel?.messages?.fetch) {
-                await deletePanelMessage(tracked.message_id);
-                continue;
-            }
-
-            const message = await channel.messages.fetch(tracked.message_id);
-            if (!message) {
-                await deletePanelMessage(tracked.message_id);
-                continue;
-            }
-
-            await message.edit(await createPanel());
+            await editPanelMessage(tracked.channel_id, tracked.message_id, await createPanel());
             await markPanelMessageRefreshed(tracked.message_id);
         } catch (error) {
             if (isMissingResourceError(error)) {

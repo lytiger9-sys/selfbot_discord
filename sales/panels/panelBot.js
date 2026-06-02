@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { Client, Collection, Intents } = require('discord.js');
-const { createPanel } = require('./embed/embedBuilders');
+const { createPanel } = require('./panelLayoutV2');
+const { sendPanelMessage } = require('./panelDiscordApi');
 const {
     PANEL_REFRESH_CHECK_INTERVAL_MS,
     PANEL_REFRESH_INTERVAL_HOURS
@@ -69,16 +70,12 @@ function resetPanelBotState(destroyClient = false) {
     }
 }
 
-async function runPanelRefresh(client = panelBotClient) {
-    if (!client) {
-        return false;
-    }
-
+async function runPanelRefresh() {
     if (panelRefreshPromise) {
         return panelRefreshPromise;
     }
 
-    panelRefreshPromise = refreshTrackedPanels(client)
+    panelRefreshPromise = refreshTrackedPanels()
         .catch(error => {
             console.error('[PanelRefresh]', error.message);
             return false;
@@ -90,23 +87,23 @@ async function runPanelRefresh(client = panelBotClient) {
     return panelRefreshPromise;
 }
 
-function startPanelRefreshScheduler(client) {
+function startPanelRefreshScheduler() {
     if (panelRefreshIntervalId) {
         return panelRefreshIntervalId;
     }
 
     panelRefreshIntervalId = setInterval(() => {
-        runPanelRefresh(client).catch(() => {});
+        runPanelRefresh().catch(() => {});
     }, PANEL_REFRESH_CHECK_INTERVAL_MS);
 
-    runPanelRefresh(client).catch(() => {});
+    runPanelRefresh().catch(() => {});
     return panelRefreshIntervalId;
 }
 
 function attachPanelBotEvents(client) {
     client.on('ready', () => {
         panelBotReady = true;
-        startPanelRefreshScheduler(client);
+        startPanelRefreshScheduler();
         console.log(`[PanelBot Refresh] tracked panels refresh every ${PANEL_REFRESH_INTERVAL_HOURS}h`);
         console.log(`[PanelBot] ${client.user.tag} 패널 봇이 준비되었습니다.`);
     });
@@ -114,10 +111,6 @@ function attachPanelBotEvents(client) {
     client.on('interactionCreate', async interaction => {
         try {
             if (interaction.isButton()) {
-                if (interaction.channelId && interaction.message?.id) {
-                    trackPanelMessage(interaction.channelId, interaction.message.id).catch(() => {});
-                }
-
                 const handler = client.panelButtons.get(interaction.customId)
                     || client.panelButtons.find(item => interaction.customId.startsWith(item.customId));
 
@@ -132,6 +125,10 @@ function attachPanelBotEvents(client) {
                         });
                         return;
                     }
+                }
+
+                if (interaction.channelId && interaction.message?.id) {
+                    trackPanelMessage(interaction.channelId, interaction.message.id).catch(() => {});
                 }
 
                 if (handler?.execute) {
@@ -181,7 +178,7 @@ function attachPanelBotEvents(client) {
 
     client.on('shardResume', () => {
         panelBotReady = true;
-        startPanelRefreshScheduler(client);
+        startPanelRefreshScheduler();
         console.log('[PanelBot] 연결이 복구되었습니다.');
     });
 }
@@ -276,7 +273,10 @@ async function postPanelToChannel(channelId) {
         throw new Error('INVALID_PANEL_CHANNEL');
     }
 
-    const message = await channel.send(await createPanel());
+    const message = await sendPanelMessage(channelId, await createPanel());
+    if (!message?.id) {
+        throw new Error('DISCORD_API_INVALID_RESPONSE');
+    }
     await trackPanelMessage(channelId, message.id).catch(() => {});
     return message;
 }
