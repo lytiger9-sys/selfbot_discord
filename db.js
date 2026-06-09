@@ -210,6 +210,7 @@ async function migrateUserSettingsTable() {
     await ensureColumn('user_settings', 'activity_button_1_url', 'TEXT DEFAULT NULL');
     await ensureColumn('user_settings', 'activity_button_2_label', 'VARCHAR(64) DEFAULT NULL');
     await ensureColumn('user_settings', 'activity_button_2_url', 'TEXT DEFAULT NULL');
+    await ensureColumn('user_settings', 'bank_account', 'TEXT');
 
     const hasLegacyRpcText = await hasColumn('user_settings', 'rpc_text');
     if (hasLegacyRpcText) {
@@ -352,6 +353,7 @@ async function ensureCoreSchema() {
                 activity_button_1_url TEXT,
                 activity_button_2_label VARCHAR(64) DEFAULT NULL,
                 activity_button_2_url TEXT,
+                bank_account TEXT,
                 token TEXT
             )
         `);
